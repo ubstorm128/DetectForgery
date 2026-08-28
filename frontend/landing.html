@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Veristamp — AI Document Screening</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=DM+Sans:wght@400;500;600&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --bg: #FAF9F6;
+            --bg-elev: #FFFFFF;
+            --ink-900: #2B2825;
+            --ink-700: #4A453F;
+            --ink-500: #726B62;
+            --ink-400: #9A9187;
+            --border: rgba(43, 40, 37, 0.09);
+            --border-bright: rgba(43, 40, 37, 0.16);
+            --accent: #9C6B4A;
+            --accent-soft: rgba(156, 107, 74, 0.10);
+            --accent-soft-bright: rgba(156, 107, 74, 0.16);
+            --shadow-sm: 0 1px 2px rgba(43, 40, 37, 0.04), 0 1px 1px rgba(43, 40, 37, 0.03);
+            --shadow-md: 0 4px 16px rgba(43, 40, 37, 0.06), 0 1px 2px rgba(43, 40, 37, 0.04);
+            --shadow-lg: 0 12px 40px rgba(43, 40, 37, 0.08), 0 2px 6px rgba(43, 40, 37, 0.05);
+            --font-heading: "Fraunces", "Playfair Display", ui-serif, Georgia, serif;
+            --font-body: "DM Sans", "Libre Franklin", -apple-system, system-ui, sans-serif;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            font: 100%/1.55 var(--font-body);
+            background: var(--bg);
+            color: var(--ink-900);
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .wrap {
+            max-width: 1080px;
+            margin: 0 auto;
+            padding: 0 28px;
+        }
+
+        /* NAV */
+        nav {
+            position: sticky;
+            top: 0;
+            z-index: 50;
+            background: rgba(250, 249, 246, 0.82);
+            backdrop-filter: blur(18px) saturate(160%);
+            border-bottom: 1px solid var(--border);
+        }
+
+        nav .wrap {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            height: 68px;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-family: var(--font-heading);
+            font-weight: 600;
+            font-size: 1.15rem;
+            letter-spacing: -0.01em;
+            color: var(--ink-900);
+        }
+
+        .brand-mark {
+            width: 19px;
+            height: 19px;
+            border-radius: 6px;
+            background: var(--accent);
+            flex-shrink: 0;
+        }
+
+        .navlinks {
+            display: flex;
+            gap: 36px;
+            font-size: 0.9rem;
+            color: var(--ink-500);
+        }
+
+        .navlinks a {
+            color: inherit;
+            text-decoration: none;
+            transition: color 150ms ease;
+        }
+
+        .navlinks a:hover {
+            color: var(--ink-900);
+        }
+
+        .nav-cta {
+            font-size: 0.85rem;
+            font-weight: 500;
+            padding: 9px 18px;
+            border-radius: 20px;
+            background: var(--ink-900);
+            color: var(--bg-elev);
+            text-decoration: none;
+            transition: transform 100ms ease-out, opacity 150ms ease;
+        }
+
+        .nav-cta:active {
+            transform: scale(0.96);
+        }
+
+        .nav-cta:hover {
+            opacity: 0.85;
+        }
+
+        /* HERO */
+        header.hero {
+            padding: 112px 0 96px;
+        }
+
+        .ps-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.78rem;
+            color: var(--ink-500);
+            border: 1px solid var(--border-bright);
+            padding: 7px 14px;
+            border-radius: 999px;
+            margin-bottom: 32px;
+            background: var(--bg-elev);
+            box-shadow: var(--shadow-sm);
+        }
+
+        .ps-tag .dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--accent);
+        }
+
+        h1 {
+            font-family: var(--font-heading);
+            font-optical-sizing: auto;
+            font-size: clamp(2.5rem, 5.4vw, 4.1rem);
+            line-height: 1.06;
+            letter-spacing: -0.02em;
+            font-weight: 500;
+            color: var(--ink-900);
+            max-width: 800px;
+            margin-bottom: 28px;
+        }
+
+        h1 em {
+            font-style: normal;
+            color: var(--accent);
+        }
+
+        .hero-sub {
+            font-size: 1.15rem;
+            color: var(--ink-500);
+            max-width: 600px;
+            line-height: 1.65;
+            margin-bottom: 40px;
+            font-weight: 400;
+        }
+
+        .hero-actions {
+            display: flex;
+            gap: 14px;
+            flex-wrap: wrap;
+        }
+
+        .btn-primary {
+            background: var(--ink-900);
+            color: var(--bg-elev);
+            font-weight: 600;
+            font-size: 0.92rem;
+            padding: 14px 26px;
+            border-radius: 12px;
+            border: none;
+            cursor: pointer;
+            transition: transform 100ms ease-out, opacity 150ms ease;
+        }
+
+        .btn-primary:active {
+            transform: scale(0.97);
+        }
+
+        .btn-primary:hover {
+            opacity: 0.88;
+        }
+
+        .btn-secondary {
+            background: var(--bg-elev);
+            color: var(--ink-900);
+            font-weight: 500;
+            font-size: 0.92rem;
+            padding: 14px 26px;
+            border-radius: 12px;
+            border: 1px solid var(--border-bright);
+            cursor: pointer;
+            transition: transform 100ms ease-out, box-shadow 150ms ease;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .btn-secondary:active {
+            transform: scale(0.97);
+        }
+
+        .btn-secondary:hover {
+            box-shadow: var(--shadow-md);
+        }
+
+        /* reveal on scroll */
+        .reveal {
+            opacity: 0;
+            transform: translateY(12px);
+            transition: opacity 550ms ease, transform 550ms ease;
+        }
+
+        .reveal.in {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* SECTION shared */
+        section {
+            padding: 88px 0;
+        }
+
+        .divider {
+            border-top: 1px solid var(--border);
+        }
+
+        .eyebrow {
+            font-size: 0.78rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--accent);
+            font-weight: 600;
+            margin-bottom: 14px;
+        }
+
+        h2 {
+            font-family: var(--font-heading);
+            font-optical-sizing: auto;
+            font-size: clamp(1.7rem, 3.4vw, 2.4rem);
+            letter-spacing: -0.015em;
+            line-height: 1.2;
+            font-weight: 500;
+            margin-bottom: 18px;
+            max-width: 600px;
+            color: var(--ink-900);
+        }
+
+        .section-sub {
+            color: var(--ink-500);
+            max-width: 560px;
+            margin-bottom: 56px;
+            line-height: 1.65;
+            font-size: 1.02rem;
+        }
+
+        /* PROBLEM grid */
+        .problem-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+        }
+
+        .problem-item {
+            background: var(--bg-elev);
+            padding: 28px;
+            border-radius: 16px;
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow-sm);
+            transition: box-shadow 200ms ease, transform 200ms ease;
+        }
+
+        .problem-item:hover {
+            box-shadow: var(--shadow-md);
+            transform: translateY(-2px);
+        }
+
+        .problem-item .num {
+            font-size: 0.78rem;
+            color: var(--ink-400);
+            font-weight: 600;
+            margin-bottom: 14px;
+            letter-spacing: 0.02em;
+        }
+
+        .problem-item p {
+            font-size: 0.95rem;
+            color: var(--ink-700);
+            line-height: 1.6;
+        }
+
+        /* DIFFERENTIATOR list */
+        .diff-list {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .diff-row {
+            display: grid;
+            grid-template-columns: 52px 1fr 1.3fr;
+            gap: 28px;
+            padding: 32px 0;
+            border-top: 1px solid var(--border);
+            align-items: start;
+        }
+
+        .diff-row:last-child {
+            border-bottom: 1px solid var(--border);
+        }
+
+        .diff-idx {
+            font-size: 0.85rem;
+            color: var(--accent);
+            font-weight: 600;
+            padding-top: 2px;
+        }
+
+        .diff-title {
+            font-family: var(--font-heading);
+            font-size: 1.15rem;
+            font-weight: 500;
+            letter-spacing: -0.01em;
+            color: var(--ink-900);
+        }
+
+        .diff-desc {
+            color: var(--ink-500);
+            font-size: 0.95rem;
+            line-height: 1.65;
+        }
+
+        /* HOW IT WORKS */
+        .flow {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 18px;
+        }
+
+        .flow-step {
+            position: relative;
+            padding: 26px 20px;
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            background: var(--bg-elev);
+            box-shadow: var(--shadow-sm);
+        }
+
+        .flow-step .step-num {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            background: var(--accent-soft);
+            color: var(--accent);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.8rem;
+            font-weight: 700;
+            margin-bottom: 16px;
+        }
+
+        .flow-step h3 {
+            font-family: var(--font-heading);
+            font-size: 1.05rem;
+            font-weight: 500;
+            margin-bottom: 8px;
+            letter-spacing: -0.005em;
+            color: var(--ink-900);
+        }
+
+        .flow-step p {
+            font-size: 0.85rem;
+            color: var(--ink-500);
+            line-height: 1.55;
+        }
+
+        /* FOOTER / CTA */
+        .cta-final {
+            text-align: center;
+            padding: 100px 0;
+        }
+
+        .cta-final h2 {
+            margin: 0 auto 16px;
+            text-align: center;
+            max-width: 540px;
+        }
+
+        .cta-final .section-sub {
+            margin: 0 auto 40px;
+            text-align: center;
+        }
+
+        .cta-final .hero-actions {
+            justify-content: center;
+        }
+
+        footer {
+            padding: 36px 0;
+            color: var(--ink-400);
+            font-size: 0.82rem;
+            border-top: 1px solid var(--border);
+        }
+
+        footer .wrap {
+            display: flex;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        @media (max-width:760px) {
+            .problem-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .diff-row {
+                grid-template-columns: 1fr;
+                gap: 10px;
+            }
+
+            .flow {
+                grid-template-columns: 1fr 1fr;
+            }
+
+            .navlinks {
+                display: none;
+            }
+        }
+
+        @media (prefers-reduced-motion:reduce) {
+            .reveal {
+                transition: opacity 200ms ease;
+                transform: none;
+            }
+
+            html {
+                scroll-behavior: auto;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <nav>
+        <div class="wrap">
+            <div class="brand"><span class="brand-mark"></span>Veristamp</div>
+            <div class="navlinks">
+                <a href="#problem">Problem</a>
+                <a href="#approach">Approach</a>
+                <a href="#flow">How it works</a>
+            </div>
+            <a class="nav-cta" href="#demo">Try the demo</a>
+        </div>
+    </nav>
+
+    <header class="hero">
+        <div class="wrap">
+            <div class="ps-tag"><span class="dot"></span>SIH Problem Statement 26188 · Ministry of Home Affairs · SSB
+            </div>
+            <h1>Catching forged travel documents <em>before they cross the line.</em></h1>
+            <p class="hero-sub">An explainable screening system for passports and visas — validating MRZ checksums,
+                cross-field consistency, and photo tampering, and flagging multi-identity fraud against a watchlist.
+                Built for checkpoint conditions: fast, offline-capable, and transparent about every decision it makes.
+            </p>
+            <div class="hero-actions">
+                <button class="btn-primary" id="demo">See it in action</button>
+                <button class="btn-secondary">Read the approach</button>
+            </div>
+        </div>
+    </header>
+
+    <section id="problem" class="divider">
+        <div class="wrap">
+            <div class="eyebrow reveal">The problem</div>
+            <h2 class="reveal">Border checkpoints process thousands of documents a day — verification hasn't kept up.
+            </h2>
+            <p class="section-sub reveal">Current checks rely on human inspection and basic database lookups. That
+                leaves gaps forgers already exploit.</p>
+            <div class="problem-grid reveal">
+                <div class="problem-item">
+                    <div class="num">01</div>
+                    <p>Fake passports, visas, and altered photographs pass basic visual inspection.</p>
+                </div>
+                <div class="problem-item">
+                    <div class="num">02</div>
+                    <p>Modified dates of birth and tampered visa stamps go unnoticed under time pressure.</p>
+                </div>
+                <div class="problem-item">
+                    <div class="num">03</div>
+                    <p>The same person uses multiple identities across expired or blacklisted documents.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="approach" class="divider">
+        <div class="wrap">
+            <div class="eyebrow reveal">Our approach</div>
+            <h2 class="reveal">Deterministic checks first. Machine learning only where it earns its place.</h2>
+            <p class="section-sub reveal">Instead of a black-box fraud score, every flag names exactly what failed — so
+                an officer can verify the reasoning, not just trust a number.</p>
+            <div class="diff-list">
+                <div class="diff-row reveal">
+                    <div class="diff-idx">01</div>
+                    <div class="diff-title">MRZ checksum validation</div>
+                    <div class="diff-desc">Runs the actual ICAO 9303 check-digit algorithm on the machine-readable zone
+                        — a deterministic, verifiable test, not a guess.</div>
+                </div>
+                <div class="diff-row reveal">
+                    <div class="diff-idx">02</div>
+                    <div class="diff-title">Cross-field consistency</div>
+                    <div class="diff-desc">Confirms date of birth matches across zones, visa dates fall within passport
+                        validity, and stamp sequences are chronologically possible.</div>
+                </div>
+                <div class="diff-row reveal">
+                    <div class="diff-idx">03</div>
+                    <div class="diff-title">Photo tamper detection</div>
+                    <div class="diff-desc">Error-level analysis surfaces splicing and recompression artifacts around the
+                        photo region.</div>
+                </div>
+                <div class="diff-row reveal">
+                    <div class="diff-idx">04</div>
+                    <div class="diff-title">Multi-identity matching</div>
+                    <div class="diff-desc">Face embeddings compared against a watchlist to catch one person using
+                        several identities.</div>
+                </div>
+                <div class="diff-row reveal">
+                    <div class="diff-idx">05</div>
+                    <div class="diff-title">Offline-first inference</div>
+                    <div class="diff-desc">Runs on-device — checkpoint connectivity doesn't gate a decision.</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="flow" class="divider">
+        <div class="wrap">
+            <div class="eyebrow reveal">How it works</div>
+            <h2 class="reveal">Upload to verdict in four steps.</h2>
+            <div class="flow reveal">
+                <div class="flow-step">
+                    <div class="step-num">1</div>
+                    <h3>Upload</h3>
+                    <p>Officer scans or uploads the document image.</p>
+                </div>
+                <div class="flow-step">
+                    <div class="step-num">2</div>
+                    <h3>Extract</h3>
+                    <p>OCR reads the MRZ and visual zone fields.</p>
+                </div>
+                <div class="flow-step">
+                    <div class="step-num">3</div>
+                    <h3>Verify</h3>
+                    <p>Rule engine and face match run in parallel.</p>
+                </div>
+                <div class="flow-step">
+                    <div class="step-num">4</div>
+                    <h3>Flag</h3>
+                    <p>Explainable result — pass, or exactly what failed.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="cta-final divider">
+        <div class="wrap">
+            <h2 class="reveal">This is the landing page. The screening tool is next.</h2>
+            <p class="section-sub reveal">Upload a document and watch the checks run live.</p>
+            <div class="hero-actions reveal">
+                <button class="btn-primary">Open the screening tool</button>
+            </div>
+        </div>
+    </section>
+
+    <footer>
+        <div class="wrap">
+            <span>Veristamp — built for Smart India Hackathon</span>
+            <span>PS 26188 · Blockchain &amp; Cybersecurity</span>
+        </div>
+    </footer>
+
+    <script>
+        const io = new IntersectionObserver((entries) => {
+            entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } });
+        }, { threshold: 0.15 });
+        document.querySelectorAll('.reveal').forEach(el => io.observe(el));
+    </script>
+
+</body>
+
+</html>
