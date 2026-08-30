@@ -1,5 +1,5 @@
 // Contact form mock submission
-const API_BASE = "https://your-render-url.onrender.com"; // replace after Render deploy
+const API_BASE = "https://detectforgery.onrender.com";
 function handleContactSubmit(e) {
     e.preventDefault();
     const btn = e.target.querySelector('button');
