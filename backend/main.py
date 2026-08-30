@@ -21,14 +21,34 @@ from forensics.metadata import perform_metadata_analysis
 from forensics.edges import perform_edge_analysis
 from forensics.scoring import calculate_overall_risk
 
+from fastapi.middleware.cors import CORSMiddleware
+
 app = FastAPI(title="Veristamp Screening API")
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "https://ubstorm128.github.io",  # your GitHub Pages origin
+        "http://localhost:5500",         # optional: local dev (Live Server etc.)
+        "http://127.0.0.1:5500",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 @app.get("/")
 async def root():
     index_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "index.html"))
     if os.path.exists(index_path):
         return FileResponse(index_path)
     return {"error": "Index page not found"}
+
+@app.get("/scanner.html")
+async def scanner():
+    path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "scanner.html"))
+    if os.path.exists(path):
+        return FileResponse(path)
+    return {"error": "Not found"}
 
 @app.get("/styles.css")
 async def styles():
