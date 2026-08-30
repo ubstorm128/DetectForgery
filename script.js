@@ -1,4 +1,5 @@
 // Contact form mock submission
+const API_BASE = "https://your-render-url.onrender.com"; // replace after Render deploy
 function handleContactSubmit(e) {
     e.preventDefault();
     const btn = e.target.querySelector('button');
@@ -32,7 +33,7 @@ if (dropzone) {
 
 async function loadTemplates() {
     try {
-        const res = await fetch('/api/templates');
+        const res = await fetch(`${API_BASE}/api/templates`);
         const templates = await res.json();
         const select = document.getElementById('document-type');
         if (templates.length > 0 && select) {
@@ -91,7 +92,7 @@ async function handleFile(file) {
     formData.append('document_type', docType);
     
     try {
-        const response = await fetch('/api/analyze-image', {
+        const response = await fetch(`${API_BASE}/api/analyze-image`, {
             method: 'POST',
             body: formData
         });
@@ -177,7 +178,7 @@ async function performCrossCheck() {
             back_score: backData.authenticity_score
         };
         
-        const res = await fetch('/api/compare-sides', {
+        const res = await fetch(`${API_BASE}/api/compare-sides`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(reqBody)
