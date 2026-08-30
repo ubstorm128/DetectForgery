@@ -120,11 +120,20 @@ async function handleFile(file) {
                     performCrossCheck();
                 }
             } else {
-                // Unknown side, just treat as front for now
-                frontData = data;
-                frontFile = file;
-                alert("Could not detect side reliably. Assuming FRONT. Please upload the BACK side.");
-                resetToUploadState("Upload Aadhaar BACK Side");
+                // Unknown side, ask the user to manually override
+                const isFront = confirm("Could not auto-detect side. Is this the FRONT side?\n\n(Click OK for Front, Cancel for Back)");
+                if (isFront) {
+                    frontData = data;
+                    frontFile = file;
+                    resetToUploadState("Upload Aadhaar BACK Side");
+                } else {
+                    backData = data;
+                    if (!frontData) {
+                        resetToUploadState("Upload Aadhaar FRONT Side");
+                    } else {
+                        performCrossCheck();
+                    }
+                }
             }
             
             // If we somehow got both (e.g. they uploaded back first)
