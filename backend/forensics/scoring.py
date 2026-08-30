@@ -7,6 +7,7 @@ Checks that are not implemented yet are excluded from scoring.
 
 WEIGHTS = {
     "ocr": 0.20,
+    "qr": 0.10,
     "layout": 0.15,
     "tampering": 0.15,
     "compression": 0.05,
@@ -37,7 +38,17 @@ def calculate_overall_risk(
     }
 
     # ---------------------------------------------------------
-    # 2. Reference-based Layout
+    # 2. QR Analysis
+    # ---------------------------------------------------------
+
+    qr_risk = results.get("qr", {}).get("risk")
+    if qr_risk is not None:
+        checks["qr"] = {
+            "score": _invert_risk(qr_risk)
+        }
+
+    # ---------------------------------------------------------
+    # 3. Reference-based Layout
     # ---------------------------------------------------------
 
     layout_score = results.get("layout", {}).get("score")

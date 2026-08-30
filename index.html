@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Veristamp — Document Forensics</title>
+    <title>IDetect — Document Forensics</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -16,7 +16,7 @@
     <!-- Navigation -->
     <nav>
         <div class="nav-container">
-            <a href="#" class="brand"><span class="brand-icon"></span> Veristamp</a>
+            <a href="#" class="brand"><img src="./ficon.png" alt="Logo" style="height:28px; margin-right:8px;"> <strong>ID</strong>etect</a>
             <button class="menu-toggle"
                 onclick="document.getElementById('nav-links').classList.toggle('active')">☰</button>
             <div class="nav-links" id="nav-links">
@@ -74,7 +74,7 @@
             <div class="security-grid">
                 <div class="security-text">
                     <h2>Enterprise-Grade Tamper Detection</h2>
-                    <p>Veristamp leverages multiple forensic signals to prevent fraudulent identity documents from
+                    <p>IDetect leverages multiple forensic signals to prevent fraudulent identity documents from
                         bypassing security protocols.</p>
                     <ul class="security-list">
                         <li><span class="check-icon">✓</span> Error Level Analysis (ELA) detects spliced elements.</li>
@@ -83,14 +83,9 @@
                         <li><span class="check-icon">✓</span> Dual-side cross-verification for smart cards.</li>
                     </ul>
                     <div class="security-disclaimer">
-                        <strong>Important:</strong> Veristamp analyzes images for digital manipulation. It supplements
+                        <strong>Important:</strong> IDetect analyzes images for digital manipulation. It supplements
                         security checks but is not a substitute for official government validation APIs (e.g. UIDAI).
                     </div>
-                </div>
-                <div class="security-img">
-                    <div
-                        style="background:var(--border); width:100%; height:300px; border-radius:var(--radius); display:flex; align-items:center; justify-content:center; color:var(--text-muted);">
-                        [ Security Dashboard Illustration ]</div>
                 </div>
             </div>
 
@@ -119,28 +114,40 @@
 
         <div class="contact-grid">
             <div class="contact-info">
-                <h3>Get in Touch</h3>
-                <p>Veristamp is currently available for authorized security and government personnel.</p>
+                <h2>Get Enterprise Access</h2>
+                <p>IDetect is currently available for authorized security and government personnel.</p>
                 <ul class="contact-details">
-                    <li><strong>Organization:</strong> Ministry of Home Affairs</li>
-                    <li><strong>Department:</strong> Sashastra Seema Bal (SSB)</li>
-                    <li><strong>Email:</strong> support@veristamp-ssb.gov.in</li>
-                    <li><strong>Phone:</strong> +91 (800) 123-4567</li>
+                    <li><strong>Organization:</strong> <span>Ministry of Home Affairs</span></li>
+                    <li><strong>Department:</strong> <span>Sashastra Seema Bal (SSB)</span></li>
+                    <li><strong>Email:</strong> <span>support@idetect.gov.in</span></li>
+                    <li><strong>Phone:</strong> <span>+91 (800) 123-4567</span></li>
                 </ul>
             </div>
             <div class="contact-form">
                 <form onsubmit="handleContactSubmit(event)">
-                    <div class="form-group">
-                        <label>Name</label> <input type="text" id="contact-name" placeholder="John Doe" required>
+                    <div class="form-group accordion-group">
+                        <label onclick="this.parentElement.classList.toggle('active')">Name <span class="toggle-icon">▼</span></label>
+                        <div class="input-wrapper">
+                            <input type="text" id="contact-name" placeholder="John Doe" required>
+                        </div>
                     </div>
-                    <div class="form-group">
-                        <label>Email</label> <input type="email" id="contact-email" placeholder="john@example.com" required>
+                    <div class="form-group accordion-group">
+                        <label onclick="this.parentElement.classList.toggle('active')">Email <span class="toggle-icon">▼</span></label>
+                        <div class="input-wrapper">
+                            <input type="email" id="contact-email" placeholder="john@example.com" required>
+                        </div>
                     </div>
-                    <div class="form-group">
-                        <label>Organization</label> <input type="text" id="contact-org" placeholder="Security Dept" required>
+                    <div class="form-group accordion-group">
+                        <label onclick="this.parentElement.classList.toggle('active')">Organization <span class="toggle-icon">▼</span></label>
+                        <div class="input-wrapper">
+                            <input type="text" id="contact-org" placeholder="Security Dept" required>
+                        </div>
                     </div>
-                    <div class="form-group">
-                        <label>Message</label> <textarea id="contact-msg" placeholder="How can we help you?" required></textarea>
+                    <div class="form-group accordion-group">
+                        <label onclick="this.parentElement.classList.toggle('active')">Message <span class="toggle-icon">▼</span></label>
+                        <div class="input-wrapper">
+                            <textarea id="contact-msg" placeholder="How can we help you?" required></textarea>
+                        </div>
                     </div>
                     <button type="submit" class="btn-large btn-primary" style="width:100%;">Send Message</button>
                 </form>
@@ -152,7 +159,7 @@
     <footer>
         <div class="footer-grid">
             <div class="footer-col">
-                <a href="#" class="brand" style="margin-bottom: 1rem;"><span class="brand-icon"></span> Veristamp</a>
+                <a href="#" class="brand" style="margin-bottom: 1rem;"><img src="./ficon.png" alt="Logo" style="height:28px; margin-right:8px;"> <strong>ID</strong>etect</a>
                 <p>AI-Powered Document Forensics.</p>
                 <p>Protecting identities through advanced cryptographic and visual analysis.</p>
             </div>
@@ -180,8 +187,8 @@
             </div>
         </div>
         <div class="footer-bottom">
-            <div>&copy; 2026 Veristamp Platform. All rights reserved.</div>
-            <div>Veristamp analyzes visual manipulation. It is not a substitute for government API validation.</div>
+            <div>&copy; 2026 IDetect Platform. All rights reserved.</div>
+            <div>IDetect analyzes visual manipulation. It is not a substitute for government API validation.</div>
         </div>
     </footer>
 

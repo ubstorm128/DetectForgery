@@ -13,9 +13,6 @@ import tempfile
 import os
 import re
 
-from ocr_mrz import extract_mrz_lines
-from mrz_checksum import validate_td3
-
 from forensics.ocr_analysis import perform_ocr_analysis
 from forensics.qr_analysis import perform_qr_analysis
 from forensics.layout_analysis import perform_layout_analysis
@@ -37,6 +34,7 @@ app.add_middleware(
         "https://ubstorm128.github.io",
         "http://localhost:5500",
         "http://127.0.0.1:5500",
+        "https://detectforgery.onrender.com"
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -44,24 +42,24 @@ app.add_middleware(
 )
 
 
+def get_static_path(filename: str) -> str:
+    dev_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", filename))
+    if os.path.exists(dev_path):
+        return dev_path
+    return os.path.abspath(os.path.join(os.path.dirname(__file__), filename))
+
 @app.get("/")
+@app.get("/index.html")
 async def root():
-    index_path = os.path.abspath(
-        os.path.join(os.path.dirname(__file__), "..", "index.html")
-    )
-
-    if os.path.exists(index_path):
-        return FileResponse(index_path)
-
+    path = get_static_path("index.html")
+    if os.path.exists(path):
+        return FileResponse(path)
     return {"error": "Index page not found"}
 
 
 @app.get("/scanner.html")
 async def scanner():
-    path = os.path.abspath(
-        os.path.join(os.path.dirname(__file__), "..", "scanner.html")
-    )
-
+    path = get_static_path("scanner.html")
     if os.path.exists(path):
         return FileResponse(path)
 
@@ -70,10 +68,7 @@ async def scanner():
 
 @app.get("/styles.css")
 async def styles():
-    path = os.path.abspath(
-        os.path.join(os.path.dirname(__file__), "..", "styles.css")
-    )
-
+    path = get_static_path("styles.css")
     if os.path.exists(path):
         return FileResponse(path)
 
@@ -82,52 +77,19 @@ async def styles():
 
 @app.get("/script.js")
 async def script():
-    path = os.path.abspath(
-        os.path.join(os.path.dirname(__file__), "..", "script.js")
-    )
-
+    path = get_static_path("script.js")
     if os.path.exists(path):
         return FileResponse(path)
 
     return {"error": "Not found"}
 
+@app.get("/ficon.png")
+async def ficon():
+    path = get_static_path("ficon.png")
+    if os.path.exists(path):
+        return FileResponse(path)
 
-@app.post("/screen")
-async def screen_document(file: UploadFile = File(...)):
-    suffix = os.path.splitext(file.filename or "")[1] or ".jpg"
-
-    with tempfile.NamedTemporaryFile(
-        suffix=suffix,
-        delete=False
-    ) as tmp:
-        shutil.copyfileobj(file.file, tmp)
-        tmp_path = tmp.name
-
-    try:
-        lines = extract_mrz_lines(tmp_path)
-
-    finally:
-        os.remove(tmp_path)
-
-    candidates = [l for l in lines if len(l) == 44]
-
-    if len(candidates) < 1:
-        raise HTTPException(
-            status_code=422,
-            detail={
-                "error": "Could not read a valid MRZ line from this image.",
-                "raw_ocr_lines": lines,
-            },
-        )
-
-    line2 = candidates[-1]
-    result = validate_td3(line2)
-
-    return {
-        "filename": file.filename,
-        "raw_ocr_lines": lines,
-        "screening_result": result,
-    }
+    return {"error": "Not found"}
 
 
 @app.get("/health")
