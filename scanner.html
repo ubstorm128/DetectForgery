@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Veristamp — Document Scanner</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+
+    <!-- Navigation -->
+    <nav>
+        <div class="nav-container">
+            <a href="index.html" class="brand"><span class="brand-icon"></span> Veristamp</a>
+            <button class="menu-toggle" onclick="document.getElementById('nav-links').classList.toggle('active')">☰</button>
+            <div class="nav-links" id="nav-links">
+                <a href="index.html#home">Home</a>
+                <a href="index.html#how-it-works">How It Works</a>
+                <a href="index.html#security">Security</a>
+                <a href="index.html#contact">Contact</a>
+                <a href="scanner.html" class="nav-btn">Launch Scanner</a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Scanner Tool -->
+    <section id="scanner" class="section">
+        <div class="section-title">Document Screening Tool</div>
+        <div class="section-subtitle">Securely process documents below. No personal data is permanently stored.</div>
+        
+        <div class="scanner-container">
+            <!-- Upload Section -->
+            <div id="section-upload" class="card">
+                <div class="upload-controls">
+                    <div class="select-group">
+                        <label for="document-type">Document Type</label>
+                        <select id="document-type">
+                            <option value="aadhaar">Aadhaar (Dual Sided)</option>
+                        </select>
+                    </div>
+                    
+                    <div class="dropzone" onclick="document.getElementById('file-input').click()" id="dropzone">
+                        <div class="dropzone-icon">📄</div>
+                        <div class="dropzone-text">Click to browse or drag and drop</div>
+                        <div class="dropzone-sub">Supports JPG, PNG (Max 10MB)</div>
+                        <input type="file" id="file-input" class="hidden" accept="image/*" onchange="handleFile(this.files[0])">
+                    </div>
+                    
+                    <div style="text-align: center; margin-top: 1rem; width: 100%;">
+                        <span style="color: var(--text-muted); font-size: 0.875rem; display: block; margin-bottom: 0.5rem;">— OR —</span>
+                        <button style="border: 2px solid var(--border); padding: 0.75rem 1.5rem; border-radius: 8px; cursor: pointer; background: transparent; font-weight: 600; font-family: inherit; font-size: 0.9375rem; color: var(--text-main);" onclick="openCamera()">📷 Use Camera</button>
+                    </div>
+                </div>
+
+                <div id="camera-container" class="hidden" style="display:none; flex-direction:column; align-items:center; gap:1rem; margin-top:1.5rem;">
+                    <video id="camera-feed" autoplay playsinline style="width: 100%; max-width: 500px; border-radius: var(--radius); background: #000; border: 2px solid var(--border);"></video>
+                    <div style="display:flex; gap: 1rem;">
+                        <button style="background: var(--primary); color: white; border: none; padding: 0.75rem 1.5rem; border-radius: 8px; font-weight: 600; cursor: pointer;" onclick="captureCamera()">Capture Photo</button>
+                        <button style="border: 2px solid var(--border); padding: 0.75rem 1.5rem; border-radius: 8px; cursor: pointer; background: transparent; font-weight: 600;" onclick="closeCamera()">Cancel</button>
+                    </div>
+                    <canvas id="camera-canvas" class="hidden"></canvas>
+                </div>
+            </div>
+
+            <!-- Analyzing State -->
+            <div id="section-analyzing" class="card hidden analyzing-state">
+                <h3>Performing Forensic Analysis...</h3>
+                <div class="progress-group">
+                    <div class="progress-label"><span>OCR & Geometric Mapping</span><span id="lbl-ocr">0%</span></div>
+                    <div class="progress-track"><div class="progress-fill" id="prog-ocr"></div></div>
+                </div>
+                <div class="progress-group">
+                    <div class="progress-label"><span>Error Level Analysis (ELA)</span><span id="lbl-ela">0%</span></div>
+                    <div class="progress-track"><div class="progress-fill" id="prog-ela"></div></div>
+                </div>
+                <div class="progress-group">
+                    <div class="progress-label"><span>Copy-Move Detection (ORB)</span><span id="lbl-copy">0%</span></div>
+                    <div class="progress-track"><div class="progress-fill" id="prog-copy"></div></div>
+                </div>
+            </div>
+
+            <!-- Results Dashboard -->
+            <div id="section-results" class="hidden">
+                <div class="results-grid">
+                    <!-- Left Column: Scores -->
+                    <div class="card" style="margin-bottom: 0;">
+                        <h4 style="text-align:center; margin-bottom: 1rem; color: var(--text-muted); font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.05em;">Authenticity Score</h4>
+                        <div class="score-header" id="score-container">
+                            <div class="risk-value" id="risk-score">0</div>
+                            <div class="risk-badge" id="classification">UNKNOWN</div>
+                        </div>
+                        
+                        <h4 style="margin-bottom: 1rem; color: var(--text-muted); font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.05em;">Individual Checks</h4>
+                        <ul class="checks-list" id="checks-list"></ul>
+                    </div>
+                    
+                    <!-- Right Column: Visual Map -->
+                    <div class="card" style="margin-bottom: 0;">
+                        <h4 style="margin-bottom: 1rem; color: var(--text-muted); font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.05em;">Forensic Map</h4>
+                        <div class="canvas-wrapper">
+                            <canvas id="image-canvas"></canvas>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="action-bar">
+                    <button class="btn-large btn-primary" onclick="resetApp()">Scan Another Document</button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer>
+        <div class="footer-grid">
+            <div class="footer-col">
+                <a href="index.html" class="brand" style="margin-bottom: 1rem;"><span class="brand-icon"></span> Veristamp</a>
+                <p>AI-Powered Document Forensics.</p>
+                <p>Protecting identities through advanced cryptographic and visual analysis.</p>
+            </div>
+            <div class="footer-col">
+                <h4>Quick Links</h4>
+                <ul class="footer-links">
+                    <li><a href="index.html#home">Home</a></li>
+                    <li><a href="index.html#how-it-works">How It Works</a></li>
+                    <li><a href="scanner.html">Launch Scanner</a></li>
+                </ul>
+            </div>
+            <div class="footer-col">
+                <h4>Legal</h4>
+                <ul class="footer-links">
+                    <li><a href="#">Privacy Policy</a></li>
+                    <li><a href="#">Terms of Service</a></li>
+                </ul>
+            </div>
+        </div>
+        <div class="footer-bottom">
+            <div>&copy; 2026 Veristamp Platform. All rights reserved.</div>
+            <div>Veristamp analyzes visual manipulation. It is not a substitute for government API validation.</div>
+        </div>
+    </footer>
+
+    <!-- Scripts -->
+    <script src="./script.js"></script>
+</body>
+</html>
