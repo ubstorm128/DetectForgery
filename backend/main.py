@@ -4,6 +4,7 @@ explainable pass/fail — which check failed, not just a score.
 """
 
 from fastapi import FastAPI, UploadFile, File, HTTPException, Form
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 import shutil
 import tempfile
@@ -21,8 +22,6 @@ from forensics.metadata import perform_metadata_analysis
 from forensics.edges import perform_edge_analysis
 from forensics.scoring import calculate_overall_risk
 
-from fastapi.middleware.cors import CORSMiddleware
-
 app = FastAPI(title="Veristamp Screening API")
 
 app.add_middleware(
@@ -36,6 +35,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 @app.get("/")
 async def root():
     index_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "index.html"))
@@ -208,4 +208,4 @@ async def compare_sides(req: CompareSidesRequest):
         "combined_authenticity_score": combined_score,
         "classification": classification,
         "anomalies": anomalies
-    }
+    }
