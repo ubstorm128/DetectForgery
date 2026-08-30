@@ -117,7 +117,7 @@ async def get_templates():
 
 
 @app.post("/api/analyze-image")
-async def analyze_image(file: UploadFile = File(...), document_type: str = Form("passport")):
+async def analyze_image(file: UploadFile = File(...), document_type: str = Form("aadhaar")):
     suffix = os.path.splitext(file.filename or "")[1] or ".jpg"
     with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
         shutil.copyfileobj(file.file, tmp)

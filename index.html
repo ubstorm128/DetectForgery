@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -9,13 +10,15 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="./styles.css">
 </head>
+
 <body>
 
     <!-- Navigation -->
     <nav>
         <div class="nav-container">
             <a href="#" class="brand"><span class="brand-icon"></span> Veristamp</a>
-            <button class="menu-toggle" onclick="document.getElementById('nav-links').classList.toggle('active')">☰</button>
+            <button class="menu-toggle"
+                onclick="document.getElementById('nav-links').classList.toggle('active')">☰</button>
             <div class="nav-links" id="nav-links">
                 <a href="#home">Home</a>
                 <a href="#how-it-works">How It Works</a>
@@ -29,7 +32,8 @@
     <!-- Hero Section -->
     <header id="home" class="hero">
         <h1>AI-Powered Fake ID Detection for Security Professionals</h1>
-        <p>Advanced document forensics designed for border control, law enforcement, and critical identity verification workflows.</p>
+        <p>Advanced document forensics designed for border control, law enforcement, and critical identity verification
+            workflows.</p>
         <div class="hero-btns">
             <a href="scanner.html" class="btn-large btn-primary">Start Screening</a>
             <a href="#how-it-works" class="btn-large btn-outline">Learn More</a>
@@ -39,23 +43,27 @@
     <!-- How It Works -->
     <section id="how-it-works" class="section">
         <div class="section-title">How It Works</div>
-        <div class="section-subtitle">A seamless, three-step forensic pipeline providing immediate insights into document authenticity.</div>
-        
+        <div class="section-subtitle">A seamless, three-step forensic pipeline providing immediate insights into
+            document authenticity.</div>
+
         <div class="steps-grid">
             <div class="step-card">
                 <div class="step-icon">1</div>
                 <h3>Upload & Align</h3>
-                <p>Upload a document. The system detects the document type, aligns it geometrically, and extracts text via intelligent OCR.</p>
+                <p>Upload a document. The system detects the document type, aligns it geometrically, and extracts text
+                    via intelligent OCR.</p>
             </div>
             <div class="step-card">
                 <div class="step-icon">2</div>
                 <h3>Forensic Analysis</h3>
-                <p>Advanced checks including Error Level Analysis (ELA) and ORB Copy-Move detection run in parallel to find manipulations.</p>
+                <p>Advanced checks including Error Level Analysis (ELA) and ORB Copy-Move detection run in parallel to
+                    find manipulations.</p>
             </div>
             <div class="step-card">
                 <div class="step-icon">3</div>
                 <h3>Authenticity Score</h3>
-                <p>Receive a comprehensive Authenticity Score, categorized risk levels, and visual bounding boxes highlighting anomalies.</p>
+                <p>Receive a comprehensive Authenticity Score, categorized risk levels, and visual bounding boxes
+                    highlighting anomalies.</p>
             </div>
         </div>
     </section>
@@ -66,7 +74,8 @@
             <div class="security-grid">
                 <div class="security-text">
                     <h2>Enterprise-Grade Tamper Detection</h2>
-                    <p>Veristamp leverages multiple forensic signals to prevent fraudulent identity documents from bypassing security protocols.</p>
+                    <p>Veristamp leverages multiple forensic signals to prevent fraudulent identity documents from
+                        bypassing security protocols.</p>
                     <ul class="security-list">
                         <li><span class="check-icon">✓</span> Error Level Analysis (ELA) detects spliced elements.</li>
                         <li><span class="check-icon">✓</span> Geometric and Font Consistency OCR checks.</li>
@@ -74,14 +83,17 @@
                         <li><span class="check-icon">✓</span> Dual-side cross-verification for smart cards.</li>
                     </ul>
                     <div class="security-disclaimer">
-                        <strong>Important:</strong> Veristamp analyzes images for digital manipulation. It supplements security checks but is not a substitute for official government validation APIs (e.g. UIDAI).
+                        <strong>Important:</strong> Veristamp analyzes images for digital manipulation. It supplements
+                        security checks but is not a substitute for official government validation APIs (e.g. UIDAI).
                     </div>
                 </div>
                 <div class="security-img">
-                    <div style="background:var(--border); width:100%; height:300px; border-radius:var(--radius); display:flex; align-items:center; justify-content:center; color:var(--text-muted);">[ Security Dashboard Illustration ]</div>
+                    <div
+                        style="background:var(--border); width:100%; height:300px; border-radius:var(--radius); display:flex; align-items:center; justify-content:center; color:var(--text-muted);">
+                        [ Security Dashboard Illustration ]</div>
                 </div>
             </div>
-            
+
             <div class="stats-row">
                 <div class="stat-item">
                     <div class="stat-val">5+</div>
@@ -104,7 +116,7 @@
     <section id="contact" class="section">
         <div class="section-title">Contact Us</div>
         <div class="section-subtitle">Request enterprise access or technical support.</div>
-        
+
         <div class="contact-grid">
             <div class="contact-info">
                 <h3>Get in Touch</h3>
@@ -119,20 +131,16 @@
             <div class="contact-form">
                 <form onsubmit="handleContactSubmit(event)">
                     <div class="form-group">
-                        <label>Name</label>
-                        <input type="text" id="contact-name" placeholder="John Doe" required>
+                        <label>Name</label> <input type="text" id="contact-name" placeholder="John Doe" required>
                     </div>
                     <div class="form-group">
-                        <label>Email</label>
-                        <input type="email" id="contact-email" placeholder="john@example.com" required>
+                        <label>Email</label> <input type="email" id="contact-email" placeholder="john@example.com" required>
                     </div>
                     <div class="form-group">
-                        <label>Organization</label>
-                        <input type="text" id="contact-org" placeholder="Security Dept" required>
+                        <label>Organization</label> <input type="text" id="contact-org" placeholder="Security Dept" required>
                     </div>
                     <div class="form-group">
-                        <label>Message</label>
-                        <textarea id="contact-msg" placeholder="How can we help you?" required></textarea>
+                        <label>Message</label> <textarea id="contact-msg" placeholder="How can we help you?" required></textarea>
                     </div>
                     <button type="submit" class="btn-large btn-primary" style="width:100%;">Send Message</button>
                 </form>
@@ -180,4 +188,5 @@
     <!-- Scripts -->
     <script src="./script.js"></script>
 </body>
+
 </html>
