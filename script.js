@@ -285,3 +285,56 @@ function resetApp() {
         document.getElementById('lbl-' + k).textContent = '0%';
     });
 }
+
+let mediaStream = null;
+
+async function openCamera() {
+    const container = document.getElementById('camera-container');
+    const uploadControls = document.querySelector('.upload-controls');
+    
+    try {
+        mediaStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+        const video = document.getElementById('camera-feed');
+        video.srcObject = mediaStream;
+        
+        container.style.display = 'flex';
+        container.classList.remove('hidden');
+        uploadControls.style.display = 'none';
+    } catch (err) {
+        alert("Unable to access camera: " + err.message);
+        console.error(err);
+    }
+}
+
+function closeCamera() {
+    if (mediaStream) {
+        mediaStream.getTracks().forEach(track => track.stop());
+        mediaStream = null;
+    }
+    const container = document.getElementById('camera-container');
+    const uploadControls = document.querySelector('.upload-controls');
+    if (container) {
+        container.style.display = 'none';
+        container.classList.add('hidden');
+    }
+    if (uploadControls) {
+        uploadControls.style.display = 'flex';
+    }
+}
+
+function captureCamera() {
+    const video = document.getElementById('camera-feed');
+    const canvas = document.getElementById('camera-canvas');
+    const ctx = canvas.getContext('2d');
+    
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    
+    canvas.toBlob((blob) => {
+        const file = new File([blob], "camera_capture.jpg", { type: "image/jpeg" });
+        closeCamera();
+        handleFile(file);
+    }, 'image/jpeg', 0.95);
+}

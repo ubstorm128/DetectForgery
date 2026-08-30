@@ -122,6 +122,20 @@
                         <div class="dropzone-sub">Supports JPG, PNG (Max 10MB)</div>
                         <input type="file" id="file-input" class="hidden" accept="image/*" onchange="handleFile(this.files[0])">
                     </div>
+                    
+                    <div style="text-align: center; margin-top: 1rem; width: 100%;">
+                        <span style="color: var(--text-muted); font-size: 0.875rem; display: block; margin-bottom: 0.5rem;">— OR —</span>
+                        <button style="border: 2px solid var(--border); padding: 0.75rem 1.5rem; border-radius: 8px; cursor: pointer; background: transparent; font-weight: 600; font-family: inherit; font-size: 0.9375rem; color: var(--text-main);" onclick="openCamera()">📷 Use Camera</button>
+                    </div>
+                </div>
+
+                <div id="camera-container" class="hidden" style="display:none; flex-direction:column; align-items:center; gap:1rem; margin-top:1.5rem;">
+                    <video id="camera-feed" autoplay playsinline style="width: 100%; max-width: 500px; border-radius: var(--radius); background: #000; border: 2px solid var(--border);"></video>
+                    <div style="display:flex; gap: 1rem;">
+                        <button style="background: var(--primary); color: white; border: none; padding: 0.75rem 1.5rem; border-radius: 8px; font-weight: 600; cursor: pointer;" onclick="captureCamera()">Capture Photo</button>
+                        <button style="border: 2px solid var(--border); padding: 0.75rem 1.5rem; border-radius: 8px; cursor: pointer; background: transparent; font-weight: 600;" onclick="closeCamera()">Cancel</button>
+                    </div>
+                    <canvas id="camera-canvas" class="hidden"></canvas>
                 </div>
             </div>
 
