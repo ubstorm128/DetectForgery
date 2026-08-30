@@ -1,0 +1,245 @@
+{
+  "document": {
+    "type": "aadhaar",
+    "country": "IN",
+    "language": ["en", "hi"],
+    "version": "standard"
+  },
+  "privacy": {
+    "store_full_aadhaar_number": false,
+    "mask_aadhaar_number_in_results": true,
+    "store_uploaded_image": false,
+    "log_extracted_pii": false
+  },
+  "ocr": {
+    "engine": "tesseract",
+    "languages": ["eng", "hin"],
+    "confidence_threshold": 75,
+    "detect_text_regions": true,
+    "detect_font_anomalies": true,
+    "detect_text_alignment": true,
+    "detect_spacing_anomalies": true,
+    "detect_baseline_anomalies": true
+  },
+  "fields": {
+    "name": {
+      "required": true,
+      "type": "text",
+      "confidence_threshold": 80,
+      "allow_hindi": true,
+      "allow_english": true
+    },
+    "date_of_birth": {
+      "required": true,
+      "type": "date",
+      "formats": [
+        "DD/MM/YYYY",
+        "DD-MM-YYYY"
+      ]
+    },
+    "gender": {
+      "required": true,
+      "allowed_values": [
+        "Male",
+        "Female",
+        "Other",
+        "MALE",
+        "FEMALE"
+      ]
+    },
+    "aadhaar_number": {
+      "required": true,
+      "type": "numeric",
+      "length": 12,
+      "pattern": "^[0-9]{4}\\s?[0-9]{4}\\s?[0-9]{4}$",
+      "mask_output": true
+    },
+    "issue_date": {
+      "required": false,
+      "type": "date"
+    }
+  },
+  "layout": {
+    "expected_aspect_ratio": {
+      "min": 1.45,
+      "max": 1.65
+    },
+    "regions": {
+      "government_logo": {
+        "required": true,
+        "position": "top_left"
+      },
+      "aadhaar_logo": {
+        "required": true,
+        "position": "top_right"
+      },
+      "government_header": {
+        "required": true,
+        "position": "top_center"
+      },
+      "photo": {
+        "required": true,
+        "position": "left_center"
+      },
+      "personal_details": {
+        "required": true,
+        "position": "right_center"
+      },
+      "verification_notice": {
+        "required": true,
+        "position": "middle_right"
+      },
+      "aadhaar_number": {
+        "required": true,
+        "position": "bottom_center"
+      }
+    },
+    "alignment_tolerance_px": 8,
+    "rotation_tolerance_degrees": 3
+  },
+  "image_analysis": {
+    "resolution": {
+      "minimum_width": 800,
+      "minimum_height": 500
+    },
+    "blur_detection": {
+      "enabled": true,
+      "minimum_laplacian_variance": 80
+    },
+    "noise_analysis": {
+      "enabled": true,
+      "detect_inconsistent_noise": true
+    },
+    "compression_analysis": {
+      "enabled": true,
+      "detect_jpeg_artifacts": true,
+      "detect_inconsistent_compression": true
+    },
+    "ela": {
+      "enabled": true,
+      "quality": 90,
+      "threshold": 25
+    },
+    "resampling_analysis": {
+      "enabled": true,
+      "detect_resized_regions": true,
+      "detect_interpolation_artifacts": true
+    },
+    "edge_analysis": {
+      "enabled": true,
+      "detect_edge_inconsistency": true
+    }
+  },
+  "tampering_detection": {
+    "copy_move": {
+      "enabled": true,
+      "similarity_threshold": 0.85,
+      "minimum_region_size": 500
+    },
+    "text_tampering": {
+      "enabled": true,
+      "compare_character_spacing": true,
+      "compare_font_size": true,
+      "compare_font_weight": true,
+      "compare_text_color": true,
+      "compare_baseline": true
+    },
+    "number_tampering": {
+      "enabled": true,
+      "check_digit_shape": true,
+      "check_spacing": true,
+      "check_alignment": true,
+      "check_font_consistency": true
+    },
+    "photo_tampering": {
+      "enabled": true,
+      "detect_replacement": true,
+      "detect_boundary_anomalies": true,
+      "detect_resampling": true
+    }
+  },
+  "qr_verification": {
+    "enabled": true,
+    "detect_qr": true,
+    "decode_qr": true,
+    "validate_payload": true,
+    "compare_qr_with_ocr": true,
+    "compare_qr_with_document": true
+  },
+  "metadata": {
+    "enabled": true,
+    "extract_exif": true,
+    "check_software_tag": true,
+    "check_editing_software": true,
+    "check_creation_date": true,
+    "check_modification_date": true
+  },
+  "comparison": {
+    "enabled": true,
+    "checks": {
+      "ocr_vs_document": {
+        "enabled": true,
+        "weight": 20
+      },
+      "ocr_vs_qr": {
+        "enabled": true,
+        "weight": 25
+      },
+      "layout": {
+        "enabled": true,
+        "weight": 15
+      },
+      "font_consistency": {
+        "enabled": true,
+        "weight": 10
+      },
+      "image_tampering": {
+        "enabled": true,
+        "weight": 15
+      },
+      "compression": {
+        "enabled": true,
+        "weight": 5
+      },
+      "metadata": {
+        "enabled": true,
+        "weight": 5
+      },
+      "photo_analysis": {
+        "enabled": true,
+        "weight": 5
+      }
+    }
+  },
+  "decision": {
+    "score_range": {
+      "genuine": {
+        "min": 85,
+        "max": 100
+      },
+      "suspicious": {
+        "min": 60,
+        "max": 84
+      },
+      "likely_fake": {
+        "min": 0,
+        "max": 59
+      }
+    },
+    "critical_failures": [
+      "invalid_qr",
+      "major_ocr_mismatch",
+      "major_layout_mismatch",
+      "strong_copy_move_detected",
+      "strong_text_tampering_detected"
+    ]
+  },
+  "output": {
+    "show_score": true,
+    "show_individual_checks": true,
+    "show_suspicious_regions": true,
+    "show_ocr_confidence": true,
+    "show_tampering_heatmap": true,
+    "mask_sensitive_data": true
+  }
+}

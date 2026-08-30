@@ -1,0 +1,250 @@
+{
+  "document": {
+    "type": "aadhaar",
+    "side": "back",
+    "country": "IN",
+    "languages": ["eng", "hin"]
+  },
+  "privacy": {
+    "store_full_aadhaar_number": false,
+    "store_full_vid": false,
+    "mask_sensitive_data": true
+  },
+  "ocr": {
+    "engine": "tesseract",
+    "languages": ["eng", "hin"],
+    "confidence_threshold": 75,
+    "detect_text_regions": true,
+    "detect_rotation": true,
+    "detect_skew": true
+  },
+  "fields": {
+    "address": {
+      "required": true,
+      "type": "multiline_text",
+      "confidence_threshold": 70,
+      "max_lines": 6
+    },
+    "care_of": {
+      "required": false,
+      "patterns": [
+        "C/O",
+        "S/O",
+        "D/O",
+        "W/O"
+      ]
+    },
+    "district": {
+      "required": false,
+      "type": "text"
+    },
+    "state": {
+      "required": true,
+      "type": "text"
+    },
+    "pincode": {
+      "required": true,
+      "type": "numeric",
+      "length": 6,
+      "pattern": "^[0-9]{6}$"
+    },
+    "aadhaar_number": {
+      "required": true,
+      "type": "numeric",
+      "length": 12,
+      "pattern": "^[0-9]{4}\\s?[0-9]{4}\\s?[0-9]{4}$",
+      "mask_output": true
+    },
+    "vid": {
+      "required": false,
+      "type": "numeric",
+      "length": 16,
+      "pattern": "^[0-9]{4}\\s?[0-9]{4}\\s?[0-9]{4}\\s?[0-9]{4}$",
+      "mask_output": true
+    },
+    "website": {
+      "required": false,
+      "expected_domain": "uidai.gov.in"
+    },
+    "helpline": {
+      "required": false,
+      "expected_value": "1947"
+    }
+  },
+  "layout": {
+    "expected_orientation": "landscape",
+    "regions": {
+      "government_header": {
+        "required": true,
+        "position": "top",
+        "relative": {
+          "x": 0.20,
+          "y": 0.03,
+          "width": 0.60,
+          "height": 0.12
+        }
+      },
+      "government_emblem": {
+        "required": true,
+        "position": "top_left"
+      },
+      "aadhaar_logo": {
+        "required": true,
+        "position": "top_right"
+      },
+      "address_block": {
+        "required": true,
+        "position": "left_center"
+      },
+      "qr_code": {
+        "required": true,
+        "position": "right_center"
+      },
+      "aadhaar_number": {
+        "required": true,
+        "position": "bottom_center"
+      },
+      "vid": {
+        "required": false,
+        "position": "below_aadhaar_number"
+      },
+      "footer": {
+        "required": true,
+        "position": "bottom"
+      }
+    },
+    "alignment": {
+      "enabled": true,
+      "tolerance_pixels": 8
+    }
+  },
+  "qr_analysis": {
+    "enabled": true,
+    "detection": {
+      "required": true,
+      "minimum_size_pixels": 200
+    },
+    "decoding": {
+      "enabled": true,
+      "retry_with_grayscale": true,
+      "retry_with_threshold": true,
+      "retry_with_sharpening": true
+    },
+    "validation": {
+      "check_payload": true,
+      "check_signature_if_available": true
+    },
+    "cross_check": {
+      "enabled": true,
+      "compare_qr_with_ocr": true,
+      "compare_aadhaar_number": true,
+      "compare_name": true,
+      "compare_dob": true,
+      "compare_gender": true,
+      "compare_address": true
+    }
+  },
+  "image_forensics": {
+    "ela": {
+      "enabled": true,
+      "jpeg_quality": 90,
+      "threshold": 25
+    },
+    "noise_analysis": {
+      "enabled": true,
+      "detect_inconsistent_noise": true
+    },
+    "compression_analysis": {
+      "enabled": true,
+      "detect_jpeg_artifacts": true,
+      "detect_inconsistent_compression": true
+    },
+    "resampling_analysis": {
+      "enabled": true,
+      "detect_resized_regions": true,
+      "detect_interpolation_artifacts": true
+    },
+    "edge_analysis": {
+      "enabled": true,
+      "detect_edge_inconsistency": true
+    }
+  },
+  "copy_move_detection": {
+    "enabled": true,
+    "similarity_threshold": 0.85,
+    "minimum_region_size": 500
+  },
+  "text_analysis": {
+    "enabled": true,
+    "font": {
+      "detect_size_difference": true,
+      "detect_weight_difference": true,
+      "detect_font_style_difference": true
+    },
+    "spacing": {
+      "detect_character_spacing": true,
+      "detect_word_spacing": true,
+      "detect_line_spacing": true
+    },
+    "alignment": {
+      "detect_horizontal_alignment": true,
+      "detect_vertical_alignment": true,
+      "detect_baseline_difference": true
+    },
+    "color": {
+      "detect_text_color_difference": true
+    }
+  },
+  "metadata_analysis": {
+    "enabled": true,
+    "extract_exif": true,
+    "check_creation_date": true,
+    "check_modification_date": true,
+    "check_editing_software": true
+  },
+  "cross_side_comparison": {
+    "enabled": true,
+    "compare_with_front": {
+      "name": true,
+      "dob": true,
+      "gender": true,
+      "aadhaar_number": true,
+      "photo": true
+    },
+    "weights": {
+      "aadhaar_number": 25,
+      "name": 20,
+      "dob": 15,
+      "gender": 10,
+      "photo": 10,
+      "layout": 10,
+      "document_structure": 10
+    }
+  },
+  "scoring": {
+    "weights": {
+      "ocr": 15,
+      "qr": 25,
+      "layout": 15,
+      "text_consistency": 10,
+      "image_forensics": 15,
+      "cross_side_match": 15,
+      "metadata": 5
+    },
+    "thresholds": {
+      "genuine": 85,
+      "suspicious": 60,
+      "likely_fake": 0
+    }
+  },
+  "output": {
+    "show_authenticity_score": true,
+    "show_ocr_confidence": true,
+    "show_qr_status": true,
+    "show_cross_side_comparison": true,
+    "show_suspicious_regions": true,
+    "show_ela_heatmap": true,
+    "mask_aadhaar_number": true,
+    "mask_vid": true
+  }
+}
