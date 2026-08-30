@@ -21,12 +21,7 @@ from forensics.metadata import perform_metadata_analysis
 from forensics.edges import perform_edge_analysis
 from forensics.scoring import calculate_overall_risk
 
-from fastapi.staticfiles import StaticFiles
-
 app = FastAPI(title="Veristamp Screening API")
-
-static_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "static"))
-app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
 @app.get("/")
 async def root():
@@ -34,6 +29,20 @@ async def root():
     if os.path.exists(index_path):
         return FileResponse(index_path)
     return {"error": "Index page not found"}
+
+@app.get("/styles.css")
+async def styles():
+    path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "styles.css"))
+    if os.path.exists(path):
+        return FileResponse(path)
+    return {"error": "Not found"}
+
+@app.get("/script.js")
+async def script():
+    path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "script.js"))
+    if os.path.exists(path):
+        return FileResponse(path)
+    return {"error": "Not found"}
 
 
 @app.post("/screen")
