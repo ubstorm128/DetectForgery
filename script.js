@@ -73,50 +73,78 @@ function showCustomPopup(title, message, type = 'alert', confirmText = 'OK', can
         overlay.style.justifyContent = 'center';
         overlay.style.zIndex = '9999';
         overlay.style.opacity = '0';
-        overlay.style.transition = 'opacity 0.2s ease';
+        overlay.style.transition = 'opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1)';
+        overlay.style.backdropFilter = 'blur(6px)';
+        overlay.style.backgroundColor = 'rgba(15, 23, 42, 0.4)';
 
         const modal = document.createElement('div');
         modal.className = 'modal-content';
         modal.style.position = 'relative';
-        modal.style.width = '100%';
-        modal.style.maxWidth = '400px';
-        modal.style.margin = '0 20px';
-        modal.style.padding = '24px';
-        modal.style.borderRadius = '16px';
+        modal.style.width = '90%';
+        modal.style.maxWidth = '380px';
+        modal.style.margin = '0 auto';
+        modal.style.padding = '32px 24px';
+        modal.style.borderRadius = '24px';
         modal.style.backgroundColor = 'var(--surface)';
-        modal.style.boxShadow = '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)';
-        modal.style.transform = 'scale(0.95)';
-        modal.style.transition = 'transform 0.2s ease';
+        modal.style.boxShadow = '0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(0,0,0,0.05)';
+        modal.style.transform = 'scale(0.95) translateY(10px)';
+        modal.style.transition = 'all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)';
+        modal.style.display = 'flex';
+        modal.style.flexDirection = 'column';
+        modal.style.alignItems = 'center';
+        modal.style.textAlign = 'center';
+
+        const iconContainer = document.createElement('div');
+        iconContainer.style.width = '56px';
+        iconContainer.style.height = '56px';
+        iconContainer.style.borderRadius = '50%';
+        iconContainer.style.display = 'flex';
+        iconContainer.style.alignItems = 'center';
+        iconContainer.style.justifyContent = 'center';
+        iconContainer.style.marginBottom = '20px';
+        
+        if (type === 'confirm') {
+            iconContainer.style.backgroundColor = 'rgba(245, 158, 11, 0.15)';
+            iconContainer.style.color = '#f59e0b';
+            iconContainer.innerHTML = `<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>`;
+        } else {
+            iconContainer.style.backgroundColor = 'rgba(59, 130, 246, 0.15)';
+            iconContainer.style.color = '#3b82f6';
+            iconContainer.innerHTML = `<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>`;
+        }
 
         const titleEl = document.createElement('h3');
         titleEl.textContent = title;
-        titleEl.style.marginTop = '0';
-        titleEl.style.marginBottom = '12px';
+        titleEl.style.margin = '0 0 12px 0';
         titleEl.style.fontSize = '1.25rem';
+        titleEl.style.fontWeight = '700';
         titleEl.style.color = 'var(--text-primary)';
+        titleEl.style.letterSpacing = '-0.02em';
 
         const msgEl = document.createElement('p');
         msgEl.innerHTML = message.replace(/\n/g, '<br>');
         msgEl.style.color = 'var(--text-muted)';
-        msgEl.style.marginBottom = '24px';
+        msgEl.style.margin = '0 0 28px 0';
         msgEl.style.fontSize = '0.95rem';
-        msgEl.style.lineHeight = '1.5';
+        msgEl.style.lineHeight = '1.6';
 
         const actionRow = document.createElement('div');
         actionRow.style.display = 'flex';
-        actionRow.style.justifyContent = 'flex-end';
+        actionRow.style.justifyContent = 'center';
+        actionRow.style.width = '100%';
         actionRow.style.gap = '12px';
 
         const closePopup = () => {
             overlay.style.opacity = '0';
-            modal.style.transform = 'scale(0.95)';
-            setTimeout(() => document.body.removeChild(overlay), 200);
+            modal.style.transform = 'scale(0.95) translateY(10px)';
+            setTimeout(() => document.body.removeChild(overlay), 300);
         };
 
         if (type === 'confirm') {
             const cancelBtn = document.createElement('button');
             cancelBtn.className = 'btn-outline';
             cancelBtn.textContent = cancelText;
+            cancelBtn.style.flex = '1';
             cancelBtn.onclick = () => {
                 closePopup();
                 resolve(false);
@@ -127,12 +155,14 @@ function showCustomPopup(title, message, type = 'alert', confirmText = 'OK', can
         const confirmBtn = document.createElement('button');
         confirmBtn.className = 'btn-primary';
         confirmBtn.textContent = confirmText;
+        confirmBtn.style.flex = '1';
         confirmBtn.onclick = () => {
             closePopup();
             resolve(true);
         };
         actionRow.appendChild(confirmBtn);
 
+        modal.appendChild(iconContainer);
         modal.appendChild(titleEl);
         modal.appendChild(msgEl);
         modal.appendChild(actionRow);
@@ -142,7 +172,7 @@ function showCustomPopup(title, message, type = 'alert', confirmText = 'OK', can
 
         requestAnimationFrame(() => {
             overlay.style.opacity = '1';
-            modal.style.transform = 'scale(1)';
+            modal.style.transform = 'scale(1) translateY(0)';
         });
     });
 }
@@ -155,6 +185,11 @@ async function handleFile(file) {
     document.getElementById('section-upload').classList.add('hidden');
     document.getElementById('section-results').classList.add('hidden');
     document.getElementById('section-analyzing').classList.remove('hidden');
+    
+    const analyzingStatusText = document.getElementById('analyzing-status-text');
+    if (analyzingStatusText) {
+        analyzingStatusText.textContent = 'Detecting ID card...';
+    }
     
     // Smooth progress simulation during pipeline steps
     let prog = 0;
@@ -200,6 +235,18 @@ async function handleFile(file) {
         const data = await response.json();
         
         clearInterval(interval);
+        
+        if (data.error === "CARD_NOT_DETECTED") {
+            await showCustomPopup(
+                "ID Card Not Detected",
+                "Please upload a clear image of a supported ID card to continue verification.",
+                "alert",
+                "Upload ID Card"
+            );
+            resetToUploadState("Click to browse or drag and drop");
+            return;
+        }
+
         ['persp', 'ocr', 'layout', 'ela'].forEach(k => {
             const p = document.getElementById('prog-' + k);
             const l = document.getElementById('lbl-' + k);
@@ -279,10 +326,18 @@ async function performCrossCheck() {
     document.getElementById('section-upload').classList.add('hidden');
     document.getElementById('section-analyzing').classList.remove('hidden');
     
+    const analyzingStatusText = document.getElementById('analyzing-status-text');
+    if (analyzingStatusText) {
+        analyzingStatusText.textContent = 'Performing cross-check analysis...';
+    }
+    
     try {
         const reqBody = {
+            document_type: document.getElementById('document-type').value,
             front_text: (frontData.ocr && frontData.ocr.text) || "",
             back_text: (backData.ocr && backData.ocr.text) || "",
+            front_boxes: (frontData.ocr && frontData.ocr.boxes) || [],
+            back_boxes: (backData.ocr && backData.ocr.boxes) || [],
             front_score: frontData.authenticity_score || frontData.overall_score || 85,
             back_score: backData.authenticity_score || backData.overall_score || 85,
             front_aadhaar: (frontData.ocr && frontData.ocr.aadhaar_number) || "",
@@ -310,15 +365,22 @@ async function performCrossCheck() {
             warnings: frontData.warnings || []
         };
         
-        if (compareData.status === "FAIL") {
+        const status = compareData.comparison ? compareData.comparison.status : compareData.status;
+        
+        if (status === "MISMATCH") {
             mergedData.checks["cross_match"] = { score: 20, status: "FAIL", name: "Front/Back Cross-Match" };
-        } else {
+        } else if (status === "MATCH") {
             mergedData.checks["cross_match"] = { score: 100, status: "PASS", name: "Front/Back Cross-Match" };
+        } else {
+            // NOT_DETECTED doesn't inherently mean fake, just couldn't read it
+            mergedData.checks["cross_match"] = { score: 85, status: "PASS", name: "Front/Back Cross-Match (Unverified)" };
         }
         
+        mergedData.comparison = compareData.comparison;
         mergedData.matched_aadhaar = compareData.matched_aadhaar;
         mergedData.front_number = compareData.front_number;
         mergedData.back_number = compareData.back_number;
+        mergedData.card_type = compareData.card_type || "Aadhaar";
         
         setTimeout(() => showResults(mergedData, frontFile, compareData.anomalies), 400);
         
@@ -362,7 +424,7 @@ function showResults(data, file, extraAnomalies=[]) {
     // Display Aadhaar Number
     let aadhaarEl = document.getElementById('aadhaar-number-display');
     
-    if (data.matched_aadhaar || (data.front_number && data.back_number && data.front_number !== data.back_number)) {
+    if (data.matched_aadhaar || data.front_number !== undefined || data.back_number !== undefined) {
         if (!aadhaarEl) {
             aadhaarEl = document.createElement('div');
             aadhaarEl.id = 'aadhaar-number-display';
@@ -380,15 +442,20 @@ function showResults(data, file, extraAnomalies=[]) {
             }
         }
         
-        if (data.matched_aadhaar) {
-            const formatted = data.matched_aadhaar.replace(/(.{4})/g, '$1 ').trim();
-            aadhaarEl.innerHTML = `Aadhaar Number: <span style="font-size: 1.1rem; letter-spacing: 2px;">${formatted}</span>`;
+        const cardName = (data.card_type || "Aadhaar").toUpperCase();
+        
+        if (data.matched_aadhaar || (data.comparison && data.comparison.status === "MATCH")) {
+            const num = data.matched_aadhaar || data.front_number;
+            const formatted = num.replace(/(.{4})/g, '$1 ').trim();
+            aadhaarEl.innerHTML = `${cardName} NUMBER: <span style="font-size: 1.1rem; letter-spacing: 2px;">${formatted}</span>`;
             aadhaarEl.style.backgroundColor = 'rgba(59, 130, 246, 0.1)';
             aadhaarEl.style.border = '1px solid var(--primary)';
             aadhaarEl.style.color = 'var(--primary)';
+        } else if (!data.front_number && !data.back_number) {
+            aadhaarEl.style.display = 'none';
         } else {
-            const formattedF = data.front_number.replace(/(.{4})/g, '$1 ').trim();
-            const formattedB = data.back_number.replace(/(.{4})/g, '$1 ').trim();
+            const formattedF = data.front_number ? data.front_number.replace(/(.{4})/g, '$1 ').trim() : "NOT DETECTED";
+            const formattedB = data.back_number ? data.back_number.replace(/(.{4})/g, '$1 ').trim() : "NOT DETECTED";
             aadhaarEl.innerHTML = `
                 <div style="color: var(--danger); font-size: 0.9rem; text-transform: uppercase; margin-bottom: 0.25rem;">⚠ Number Mismatch</div>
                 <div style="font-size: 0.85rem; color: var(--text-muted); font-weight: 500;">Front: <span style="text-decoration: line-through;">${formattedF}</span></div>
@@ -415,7 +482,6 @@ function showResults(data, file, extraAnomalies=[]) {
         { key: 'compression', name: 'Compression (DCT)' },
         { key: 'geometry', name: 'Document Geometry' },
         { key: 'metadata', name: 'Metadata & EXIF' },
-        { key: 'qr', name: 'QR Consistency' },
         { key: 'cross_match', name: 'Front/Back Cross-Match' }
     ];
     

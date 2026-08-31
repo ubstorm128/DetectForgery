@@ -16,7 +16,6 @@ import cv2
 
 from services.image_quality import assess_image_quality
 from forensics.ocr_analysis import perform_ocr_analysis
-from forensics.qr_analysis import perform_qr_analysis
 from forensics.layout_analysis import perform_layout_analysis
 from forensics.ela import perform_ela
 from forensics.noise import perform_noise_analysis
@@ -125,8 +124,22 @@ def _process_image_pipeline(tmp_path: str, document_type: str = "aadhaar") -> di
     res_ocr = perform_ocr_analysis(tmp_path)
     detected_side = res_ocr.get("detected_side", "unknown")
 
-    # 2. QR Analysis
-    res_qr = perform_qr_analysis(tmp_path)
+    # --- NEW: Early Exit if Card Not Detected ---
+    from card_detectors.aadhaar import AadhaarDetector
+    from card_detectors.pan import PANDetector
+    
+    if document_type.lower() == "pan":
+        detector = PANDetector()
+    else:
+        detector = AadhaarDetector()
+        
+    card_check = detector.detect_card_number(res_ocr.get("boxes", []), res_ocr.get("text", ""))
+    if not card_check.get("detected", False):
+        return {
+            "error": "CARD_NOT_DETECTED",
+            "message": f"No valid {document_type.upper()} card detected in the image."
+        }
+    # --------------------------------------------
 
     # 3. Reference-based Structural Layout Analysis
     reference_dir = os.path.join(os.path.dirname(__file__), "reference")
@@ -154,7 +167,6 @@ def _process_image_pipeline(tmp_path: str, document_type: str = "aadhaar") -> di
     # 5. Combine and Calculate Weighted Authenticity Score
     results = {
         "ocr": res_ocr,
-        "qr": res_qr,
         "layout": res_layout,
         "ela": res_ela,
         "noise": res_noise,
@@ -172,7 +184,7 @@ def _process_image_pipeline(tmp_path: str, document_type: str = "aadhaar") -> di
 
     # 6. Privacy: Mask Aadhaar Number if applicable
     if document_type == "aadhaar" and "text" in res_ocr:
-        aadhaar_pattern = r"\b\d{4}\s?\d{4}\s?\d{4}\b"
+        aadhaar_pattern = r"\b\d{4}[\s\-\.]*\d{4}[\s\-\.]*\d{4}\b"
         matches = re.findall(aadhaar_pattern, res_ocr["text"])
         if matches:
             res_ocr["aadhaar_number"] = matches[0]
@@ -184,7 +196,6 @@ def _process_image_pipeline(tmp_path: str, document_type: str = "aadhaar") -> di
         )
 
     report["detected_side"] = detected_side
-    report["qr"] = res_qr
     report["layout"] = res_layout
     report["ocr"] = res_ocr
 
@@ -264,63 +275,108 @@ async def analyze_id(
             os.remove(tmp_path)
 
 
+from card_detectors.aadhaar import AadhaarDetector
+from card_detectors.pan import PANDetector
+
 class CompareSidesRequest(BaseModel):
-    front_text: str
-    back_text: str
-    front_score: int
-    back_score: int
+    document_type: str = "aadhaar"
+    front_text: str = ""
+    back_text: str = ""
+    front_boxes: list = []
+    back_boxes: list = []
+    front_score: int = 0
+    back_score: int = 0
     front_aadhaar: str = ""
     back_aadhaar: str = ""
 
 
 @app.post("/api/compare-sides")
 async def compare_sides(req: CompareSidesRequest):
-    aadhaar_pattern = r"\b\d{4}\s?\d{4}\s?\d{4}\b"
-
-    front_nums = {req.front_aadhaar} if req.front_aadhaar else set(re.findall(aadhaar_pattern, req.front_text))
-    back_nums = {req.back_aadhaar} if req.back_aadhaar else set(re.findall(aadhaar_pattern, req.back_text))
-    
-    front_nums = {n for n in front_nums if n}
-    back_nums = {n for n in back_nums if n}
-    
-    front_normalized = {re.sub(r"\s+", "", num) for num in front_nums}
-    back_normalized = {re.sub(r"\s+", "", num) for num in back_nums}
-
-    combined_score = (req.front_score + req.back_score) // 2
-    cross_check_status = "PASS"
-    anomalies = []
-    matched_number = None
-
-    if front_normalized and back_normalized:
-        intersection = front_normalized.intersection(back_normalized)
-        if not intersection:
-            cross_check_status = "FAIL"
-            combined_score = max(0, combined_score - 25)
-            anomalies.append("Aadhaar Number mismatch between Front and Back scans.")
-        else:
-            matched_number = list(intersection)[0]
-    elif front_normalized:
-        matched_number = list(front_normalized)[0]
-    elif back_normalized:
-        matched_number = list(back_normalized)[0]
-
-    if combined_score >= 80:
-        classification = "GENUINE"
-        risk_level = "LOW RISK"
-    elif combined_score >= 65:
-        classification = "SUSPICIOUS"
-        risk_level = "MEDIUM RISK"
+    if req.document_type.lower() == "pan":
+        detector = PANDetector()
     else:
+        detector = AadhaarDetector()
+        
+    front_result = detector.detect_card_number(req.front_boxes, req.front_text)
+    back_result = detector.detect_card_number(req.back_boxes, req.back_text)
+    
+    # --- DEBUG LOGGING ---
+    print("\n" + "="*20 + " CARD NUMBER DEBUG " + "="*20)
+    print(f"Card Type: {req.document_type.upper()}")
+    
+    print("\nSide: FRONT")
+    print("Raw OCR Text:", req.front_text)
+    print("Raw Boxes:", [b.get("text") for b in req.front_boxes])
+    print("Selected:", front_result)
+    
+    print("\nSide: BACK")
+    print("Raw OCR Text:", req.back_text)
+    print("Raw Boxes:", [b.get("text") for b in req.back_boxes])
+    print("Selected:", back_result)
+    print("="*60 + "\n")
+    # ---------------------
+    
+    # Fallback to the pre-extracted numbers if the detector fails and the frontend provided them
+    if not front_result["detected"] and req.front_aadhaar:
+        front_result = {"raw_text": req.front_aadhaar, "normalized": detector.normalize(req.front_aadhaar), "confidence": 0.9, "detected": True}
+    if not back_result["detected"] and req.back_aadhaar:
+        back_result = {"raw_text": req.back_aadhaar, "normalized": detector.normalize(req.back_aadhaar), "confidence": 0.9, "detected": True}
+
+    front_norm = front_result.get("normalized")
+    back_norm = back_result.get("normalized")
+    
+    status = "NOT_DETECTED"
+    if front_result["detected"] and back_result["detected"]:
+        if front_norm == back_norm:
+            status = "MATCH"
+        else:
+            status = "MISMATCH"
+            
+    combined_score = (req.front_score + req.back_score) // 2
+    classification = "GENUINE"
+    risk_level = "LOW RISK"
+    anomalies = []
+    
+    if status == "MISMATCH":
         classification = "LIKELY_FAKE"
         risk_level = "HIGH RISK"
+        combined_score = min(combined_score, 40)
+        anomalies.append(f"{req.document_type.upper()} Number mismatch between Front and Back scans.")
+    elif status == "NOT_DETECTED":
+        # Do not treat OCR failure as evidence of fraud.
+        pass
+    
+    if classification != "LIKELY_FAKE":
+        if combined_score >= 80:
+            classification = "GENUINE"
+            risk_level = "LOW RISK"
+        elif combined_score >= 65:
+            classification = "SUSPICIOUS"
+            risk_level = "MEDIUM RISK"
+        else:
+            classification = "LIKELY_FAKE"
+            risk_level = "HIGH RISK"
 
     return {
-        "status": cross_check_status,
+        # Old fields for UI backwards compatibility
+        "status": status,
         "combined_authenticity_score": combined_score,
         "risk_level": risk_level,
         "classification": classification,
         "anomalies": anomalies,
-        "matched_aadhaar": matched_number,
-        "front_number": list(front_normalized)[0] if front_normalized else None,
-        "back_number": list(back_normalized)[0] if back_normalized else None
+        "matched_aadhaar": front_norm if status == "MATCH" else None,
+        "front_number": front_norm,
+        "back_number": back_norm,
+        
+        # New Structured Response as per spec
+        "card_type": req.document_type.upper(),
+        "front": {
+            "card_number": front_result
+        },
+        "back": {
+            "card_number": back_result
+        },
+        "comparison": {
+            "status": status
+        }
     }

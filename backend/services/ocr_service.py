@@ -23,11 +23,16 @@ def get_paddle_ocr():
 
     try:
         from paddleocr import PaddleOCR
-        # Initialize PaddleOCR with English, suppressing debug logs
-        _paddle_ocr_engine = PaddleOCR(use_angle_cls=True, lang="en", show_log=False)
+        # Initialize PaddleOCR with English
+        _paddle_ocr_engine = PaddleOCR(use_angle_cls=True, lang="en")
         _paddle_available = True
         return _paddle_ocr_engine
-    except Exception:
+    except Exception as e:
+        import traceback
+        print("\n" + "!"*40)
+        print("PADDLEOCR INITIALIZATION FAILED:")
+        traceback.print_exc()
+        print("!"*40 + "\n")
         _paddle_available = False
         return None
 
