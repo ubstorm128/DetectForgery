@@ -282,16 +282,16 @@ async def compare_sides(req: CompareSidesRequest):
     
     front_nums = {n for n in front_nums if n}
     back_nums = {n for n in back_nums if n}
+    
+    front_normalized = {re.sub(r"\s+", "", num) for num in front_nums}
+    back_normalized = {re.sub(r"\s+", "", num) for num in back_nums}
 
     combined_score = (req.front_score + req.back_score) // 2
     cross_check_status = "PASS"
     anomalies = []
     matched_number = None
 
-    if front_nums and back_nums:
-        front_normalized = {re.sub(r"\s+", "", num) for num in front_nums}
-        back_normalized = {re.sub(r"\s+", "", num) for num in back_nums}
-
+    if front_normalized and back_normalized:
         intersection = front_normalized.intersection(back_normalized)
         if not intersection:
             cross_check_status = "FAIL"
@@ -299,10 +299,10 @@ async def compare_sides(req: CompareSidesRequest):
             anomalies.append("Aadhaar Number mismatch between Front and Back scans.")
         else:
             matched_number = list(intersection)[0]
-    elif front_nums:
-        matched_number = list({re.sub(r"\s+", "", num) for num in front_nums})[0]
-    elif back_nums:
-        matched_number = list({re.sub(r"\s+", "", num) for num in back_nums})[0]
+    elif front_normalized:
+        matched_number = list(front_normalized)[0]
+    elif back_normalized:
+        matched_number = list(back_normalized)[0]
 
     if combined_score >= 80:
         classification = "GENUINE"
@@ -320,5 +320,7 @@ async def compare_sides(req: CompareSidesRequest):
         "risk_level": risk_level,
         "classification": classification,
         "anomalies": anomalies,
-        "matched_aadhaar": matched_number
+        "matched_aadhaar": matched_number,
+        "front_number": list(front_normalized)[0] if front_normalized else None,
+        "back_number": list(back_normalized)[0] if back_normalized else None
     }

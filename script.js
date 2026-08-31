@@ -64,6 +64,89 @@ async function loadTemplates() {
 
 loadTemplates();
 
+function showCustomPopup(title, message, type = 'alert', confirmText = 'OK', cancelText = 'Cancel') {
+    return new Promise((resolve) => {
+        const overlay = document.createElement('div');
+        overlay.className = 'modal-backdrop';
+        overlay.style.display = 'flex';
+        overlay.style.alignItems = 'center';
+        overlay.style.justifyContent = 'center';
+        overlay.style.zIndex = '9999';
+        overlay.style.opacity = '0';
+        overlay.style.transition = 'opacity 0.2s ease';
+
+        const modal = document.createElement('div');
+        modal.className = 'modal-content';
+        modal.style.position = 'relative';
+        modal.style.width = '100%';
+        modal.style.maxWidth = '400px';
+        modal.style.margin = '0 20px';
+        modal.style.padding = '24px';
+        modal.style.borderRadius = '16px';
+        modal.style.backgroundColor = 'var(--surface)';
+        modal.style.boxShadow = '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)';
+        modal.style.transform = 'scale(0.95)';
+        modal.style.transition = 'transform 0.2s ease';
+
+        const titleEl = document.createElement('h3');
+        titleEl.textContent = title;
+        titleEl.style.marginTop = '0';
+        titleEl.style.marginBottom = '12px';
+        titleEl.style.fontSize = '1.25rem';
+        titleEl.style.color = 'var(--text-primary)';
+
+        const msgEl = document.createElement('p');
+        msgEl.innerHTML = message.replace(/\n/g, '<br>');
+        msgEl.style.color = 'var(--text-muted)';
+        msgEl.style.marginBottom = '24px';
+        msgEl.style.fontSize = '0.95rem';
+        msgEl.style.lineHeight = '1.5';
+
+        const actionRow = document.createElement('div');
+        actionRow.style.display = 'flex';
+        actionRow.style.justifyContent = 'flex-end';
+        actionRow.style.gap = '12px';
+
+        const closePopup = () => {
+            overlay.style.opacity = '0';
+            modal.style.transform = 'scale(0.95)';
+            setTimeout(() => document.body.removeChild(overlay), 200);
+        };
+
+        if (type === 'confirm') {
+            const cancelBtn = document.createElement('button');
+            cancelBtn.className = 'btn-outline';
+            cancelBtn.textContent = cancelText;
+            cancelBtn.onclick = () => {
+                closePopup();
+                resolve(false);
+            };
+            actionRow.appendChild(cancelBtn);
+        }
+
+        const confirmBtn = document.createElement('button');
+        confirmBtn.className = 'btn-primary';
+        confirmBtn.textContent = confirmText;
+        confirmBtn.onclick = () => {
+            closePopup();
+            resolve(true);
+        };
+        actionRow.appendChild(confirmBtn);
+
+        modal.appendChild(titleEl);
+        modal.appendChild(msgEl);
+        modal.appendChild(actionRow);
+        overlay.appendChild(modal);
+
+        document.body.appendChild(overlay);
+
+        requestAnimationFrame(() => {
+            overlay.style.opacity = '1';
+            modal.style.transform = 'scale(1)';
+        });
+    });
+}
+
 async function handleFile(file) {
     if (!file) return;
     
@@ -129,29 +212,36 @@ async function handleFile(file) {
             if (data.detected_side === 'front') {
                 frontData = data;
                 frontFile = file;
-                alert("Detected: Aadhaar FRONT. Please upload the BACK side now.");
-                resetToUploadState("Upload Aadhaar BACK Side");
+                if (!backData) {
+                    await showCustomPopup("Side Detected", "Detected: Aadhaar FRONT.\nPlease upload the BACK side now.");
+                    resetToUploadState("Upload Aadhaar BACK Side");
+                }
             } else if (data.detected_side === 'back') {
                 backData = data;
                 if (!frontData) {
-                    alert("Detected: Aadhaar BACK. Please upload the FRONT side now.");
+                    await showCustomPopup("Side Detected", "Detected: Aadhaar BACK.\nPlease upload the FRONT side now.");
                     resetToUploadState("Upload Aadhaar FRONT Side");
-                } else {
-                    performCrossCheck();
                 }
             } else {
                 // If side ambiguous, allow user confirmation
-                const isFront = confirm("Detected side could not be 100% distinguished. Is this the FRONT side?\n\n(Click OK for Front, Cancel for Back)");
+                const isFront = await showCustomPopup(
+                    "Ambiguous Side", 
+                    "Detected side could not be 100% distinguished.\nIs this the FRONT side?", 
+                    "confirm", 
+                    "Yes, Front", 
+                    "No, Back"
+                );
+                
                 if (isFront) {
                     frontData = data;
                     frontFile = file;
-                    resetToUploadState("Upload Aadhaar BACK Side");
+                    if (!backData) {
+                        resetToUploadState("Upload Aadhaar BACK Side");
+                    }
                 } else {
                     backData = data;
                     if (!frontData) {
                         resetToUploadState("Upload Aadhaar FRONT Side");
-                    } else {
-                        performCrossCheck();
                     }
                 }
             }
@@ -227,6 +317,8 @@ async function performCrossCheck() {
         }
         
         mergedData.matched_aadhaar = compareData.matched_aadhaar;
+        mergedData.front_number = compareData.front_number;
+        mergedData.back_number = compareData.back_number;
         
         setTimeout(() => showResults(mergedData, frontFile, compareData.anomalies), 400);
         
@@ -269,18 +361,16 @@ function showResults(data, file, extraAnomalies=[]) {
     
     // Display Aadhaar Number
     let aadhaarEl = document.getElementById('aadhaar-number-display');
-    if (data.matched_aadhaar) {
+    
+    if (data.matched_aadhaar || (data.front_number && data.back_number && data.front_number !== data.back_number)) {
         if (!aadhaarEl) {
             aadhaarEl = document.createElement('div');
             aadhaarEl.id = 'aadhaar-number-display';
             aadhaarEl.style.marginTop = '1rem';
             aadhaarEl.style.padding = '0.75rem';
-            aadhaarEl.style.backgroundColor = 'rgba(59, 130, 246, 0.1)';
-            aadhaarEl.style.border = '1px solid var(--primary)';
             aadhaarEl.style.borderRadius = '8px';
             aadhaarEl.style.fontWeight = '600';
             aadhaarEl.style.textAlign = 'center';
-            aadhaarEl.style.color = 'var(--primary)';
             // Insert before the quality card
             const qCard = document.getElementById('quality-card');
             if (qCard) {
@@ -289,8 +379,25 @@ function showResults(data, file, extraAnomalies=[]) {
                 scoreCont.parentNode.appendChild(aadhaarEl);
             }
         }
-        const formatted = data.matched_aadhaar.replace(/(.{4})/g, '$1 ').trim();
-        aadhaarEl.innerHTML = `Aadhaar Number: <span style="font-size: 1.1rem; letter-spacing: 2px;">${formatted}</span>`;
+        
+        if (data.matched_aadhaar) {
+            const formatted = data.matched_aadhaar.replace(/(.{4})/g, '$1 ').trim();
+            aadhaarEl.innerHTML = `Aadhaar Number: <span style="font-size: 1.1rem; letter-spacing: 2px;">${formatted}</span>`;
+            aadhaarEl.style.backgroundColor = 'rgba(59, 130, 246, 0.1)';
+            aadhaarEl.style.border = '1px solid var(--primary)';
+            aadhaarEl.style.color = 'var(--primary)';
+        } else {
+            const formattedF = data.front_number.replace(/(.{4})/g, '$1 ').trim();
+            const formattedB = data.back_number.replace(/(.{4})/g, '$1 ').trim();
+            aadhaarEl.innerHTML = `
+                <div style="color: var(--danger); font-size: 0.9rem; text-transform: uppercase; margin-bottom: 0.25rem;">⚠ Number Mismatch</div>
+                <div style="font-size: 0.85rem; color: var(--text-muted); font-weight: 500;">Front: <span style="text-decoration: line-through;">${formattedF}</span></div>
+                <div style="font-size: 0.85rem; color: var(--text-muted); font-weight: 500;">Back: <span style="text-decoration: line-through;">${formattedB}</span></div>
+            `;
+            aadhaarEl.style.backgroundColor = 'rgba(239, 68, 68, 0.1)';
+            aadhaarEl.style.border = '1px solid var(--danger)';
+            aadhaarEl.style.color = 'inherit';
+        }
         aadhaarEl.style.display = 'block';
     } else if (aadhaarEl) {
         aadhaarEl.style.display = 'none';
