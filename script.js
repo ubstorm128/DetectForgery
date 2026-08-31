@@ -194,7 +194,9 @@ async function performCrossCheck() {
             front_text: (frontData.ocr && frontData.ocr.text) || "",
             back_text: (backData.ocr && backData.ocr.text) || "",
             front_score: frontData.authenticity_score || frontData.overall_score || 85,
-            back_score: backData.authenticity_score || backData.overall_score || 85
+            back_score: backData.authenticity_score || backData.overall_score || 85,
+            front_aadhaar: (frontData.ocr && frontData.ocr.aadhaar_number) || "",
+            back_aadhaar: (backData.ocr && backData.ocr.aadhaar_number) || ""
         };
         
         const res = await fetch(`${API_BASE}/api/compare-sides`, {
@@ -223,6 +225,8 @@ async function performCrossCheck() {
         } else {
             mergedData.checks["cross_match"] = { score: 100, status: "PASS", name: "Front/Back Cross-Match" };
         }
+        
+        mergedData.matched_aadhaar = compareData.matched_aadhaar;
         
         setTimeout(() => showResults(mergedData, frontFile, compareData.anomalies), 400);
         
@@ -263,6 +267,35 @@ function showResults(data, file, extraAnomalies=[]) {
         document.getElementById('chip-contrast').textContent = `Contrast: ${data.image_quality.contrast || '--'}`;
     }
     
+    // Display Aadhaar Number
+    let aadhaarEl = document.getElementById('aadhaar-number-display');
+    if (data.matched_aadhaar) {
+        if (!aadhaarEl) {
+            aadhaarEl = document.createElement('div');
+            aadhaarEl.id = 'aadhaar-number-display';
+            aadhaarEl.style.marginTop = '1rem';
+            aadhaarEl.style.padding = '0.75rem';
+            aadhaarEl.style.backgroundColor = 'rgba(59, 130, 246, 0.1)';
+            aadhaarEl.style.border = '1px solid var(--primary)';
+            aadhaarEl.style.borderRadius = '8px';
+            aadhaarEl.style.fontWeight = '600';
+            aadhaarEl.style.textAlign = 'center';
+            aadhaarEl.style.color = 'var(--primary)';
+            // Insert before the quality card
+            const qCard = document.getElementById('quality-card');
+            if (qCard) {
+                qCard.parentNode.insertBefore(aadhaarEl, qCard);
+            } else {
+                scoreCont.parentNode.appendChild(aadhaarEl);
+            }
+        }
+        const formatted = data.matched_aadhaar.replace(/(.{4})/g, '$1 ').trim();
+        aadhaarEl.innerHTML = `Aadhaar Number: <span style="font-size: 1.1rem; letter-spacing: 2px;">${formatted}</span>`;
+        aadhaarEl.style.display = 'block';
+    } else if (aadhaarEl) {
+        aadhaarEl.style.display = 'none';
+    }
+
     // Populate Individual Checks Breakdown
     const list = document.getElementById('checks-list');
     list.innerHTML = '';

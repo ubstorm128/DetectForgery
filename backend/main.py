@@ -172,8 +172,13 @@ def _process_image_pipeline(tmp_path: str, document_type: str = "aadhaar") -> di
 
     # 6. Privacy: Mask Aadhaar Number if applicable
     if document_type == "aadhaar" and "text" in res_ocr:
+        aadhaar_pattern = r"\b\d{4}\s?\d{4}\s?\d{4}\b"
+        matches = re.findall(aadhaar_pattern, res_ocr["text"])
+        if matches:
+            res_ocr["aadhaar_number"] = matches[0]
+
         res_ocr["text"] = re.sub(
-            r"\b\d{4}\s?\d{4}\s?\d{4}\b",
+            aadhaar_pattern,
             "XXXX XXXX XXXX",
             res_ocr["text"]
         )
@@ -264,27 +269,40 @@ class CompareSidesRequest(BaseModel):
     back_text: str
     front_score: int
     back_score: int
+    front_aadhaar: str = ""
+    back_aadhaar: str = ""
 
 
 @app.post("/api/compare-sides")
 async def compare_sides(req: CompareSidesRequest):
     aadhaar_pattern = r"\b\d{4}\s?\d{4}\s?\d{4}\b"
 
-    front_nums = set(re.findall(aadhaar_pattern, req.front_text))
-    back_nums = set(re.findall(aadhaar_pattern, req.back_text))
+    front_nums = {req.front_aadhaar} if req.front_aadhaar else set(re.findall(aadhaar_pattern, req.front_text))
+    back_nums = {req.back_aadhaar} if req.back_aadhaar else set(re.findall(aadhaar_pattern, req.back_text))
+    
+    front_nums = {n for n in front_nums if n}
+    back_nums = {n for n in back_nums if n}
 
     combined_score = (req.front_score + req.back_score) // 2
     cross_check_status = "PASS"
     anomalies = []
+    matched_number = None
 
     if front_nums and back_nums:
         front_normalized = {re.sub(r"\s+", "", num) for num in front_nums}
         back_normalized = {re.sub(r"\s+", "", num) for num in back_nums}
 
-        if not front_normalized.intersection(back_normalized):
+        intersection = front_normalized.intersection(back_normalized)
+        if not intersection:
             cross_check_status = "FAIL"
             combined_score = max(0, combined_score - 25)
             anomalies.append("Aadhaar Number mismatch between Front and Back scans.")
+        else:
+            matched_number = list(intersection)[0]
+    elif front_nums:
+        matched_number = list({re.sub(r"\s+", "", num) for num in front_nums})[0]
+    elif back_nums:
+        matched_number = list({re.sub(r"\s+", "", num) for num in back_nums})[0]
 
     if combined_score >= 80:
         classification = "GENUINE"
@@ -301,5 +319,6 @@ async def compare_sides(req: CompareSidesRequest):
         "combined_authenticity_score": combined_score,
         "risk_level": risk_level,
         "classification": classification,
-        "anomalies": anomalies
+        "anomalies": anomalies,
+        "matched_aadhaar": matched_number
     }
