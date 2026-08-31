@@ -1,30 +1,32 @@
 """
-Extract MRZ text from a document image via Tesseract OCR.
+Extract MRZ text from a document image via PaddleOCR.
 
 Pipeline: grayscale -> crop bottom band (MRZ sits in the bottom ~25%
-of a standard passport photo page) -> threshold -> OCR with a
-whitelist restricted to MRZ's actual charset (A-Z, 0-9, <).
-
-This is intentionally the boring option: Tesseract is already
-installed, already-installed dependency solves it (ladder rung 5) -
-no custom OCR model needed for machine-printed monospace text.
+of a standard passport photo page) -> OCR -> filter for MRZ characters.
 """
 
+import cv2
+import numpy as np
 from PIL import Image, ImageOps
-import pytesseract
+import re
+from services.ocr_service import get_paddle_ocr
 
 MRZ_CHARSET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789<"
-TESSERACT_CONFIG = f"--psm 6 -c tessedit_char_whitelist={MRZ_CHARSET}"
 
 
-def _preprocess(img: Image.Image) -> Image.Image:
+def _preprocess(img_path: str) -> np.ndarray:
+    img = Image.open(img_path)
     gray = ImageOps.grayscale(img)
     w, h = gray.size
     # MRZ lives in the bottom band of the document image
     mrz_band = gray.crop((0, int(h * 0.72), w, h))
-    # simple binarization — OCR-B monospace reads cleanly off a hard threshold
-    bw = mrz_band.point(lambda p: 255 if p > 140 else 0)
-    return bw
+    
+    # Convert PIL to cv2 BGR format for PaddleOCR
+    open_cv_image = np.array(mrz_band)
+    if len(open_cv_image.shape) == 2:
+        open_cv_image = cv2.cvtColor(open_cv_image, cv2.COLOR_GRAY2BGR)
+        
+    return open_cv_image
 
 
 def extract_mrz_lines(image_path: str) -> list[str]:
@@ -33,11 +35,23 @@ def extract_mrz_lines(image_path: str) -> list[str]:
     for TD3 passports). Caller should sanity-check line count/length
     before passing to the checksum validator.
     """
-    img = Image.open(image_path)
-    processed = _preprocess(img)
-    raw = pytesseract.image_to_string(processed, config=TESSERACT_CONFIG)
-
-    lines = [l.strip().upper() for l in raw.splitlines() if l.strip()]
+    processed_bgr = _preprocess(image_path)
+    
+    paddle_engine = get_paddle_ocr()
+    if paddle_engine is None:
+        return []
+        
+    results = paddle_engine.ocr(processed_bgr, cls=False)
+    
+    lines = []
+    if results and len(results) > 0 and results[0] is not None:
+        for line in results[0]:
+            coords, (txt, conf) = line
+            # Clean text: keep only valid MRZ characters
+            txt_clean = "".join([c for c in txt.upper() if c in MRZ_CHARSET])
+            if txt_clean:
+                lines.append(txt_clean)
+                
     return lines
 
 

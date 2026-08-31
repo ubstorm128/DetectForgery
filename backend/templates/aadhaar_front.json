@@ -9,12 +9,15 @@
     "store_full_aadhaar_number": false,
     "mask_aadhaar_number_in_results": true,
     "store_uploaded_image": false,
+    "processing_mode": "in_memory_only",
+    "_comment_processing": "Images are processed transiently in memory for analysis (ELA, etc.) and discarded after the pipeline runs, never persisted to disk or DB.",
     "log_extracted_pii": false
   },
   "ocr": {
-    "engine": "tesseract",
+    "engine": "paddleocr",
     "languages": ["eng", "hin"],
     "confidence_threshold": 75,
+    "_comment_threshold": "Per-field confidence thresholds in the 'fields' section override this global default.",
     "detect_text_regions": true,
     "detect_font_anomalies": true,
     "detect_text_alignment": true,
@@ -32,6 +35,7 @@
     "date_of_birth": {
       "required": true,
       "type": "date",
+      "confidence_threshold": 80,
       "formats": [
         "DD/MM/YYYY",
         "DD-MM-YYYY"
@@ -39,24 +43,26 @@
     },
     "gender": {
       "required": true,
+      "case_insensitive": true,
+      "confidence_threshold": 80,
       "allowed_values": [
         "Male",
         "Female",
-        "Other",
-        "MALE",
-        "FEMALE"
+        "Other"
       ]
     },
     "aadhaar_number": {
       "required": true,
       "type": "numeric",
+      "confidence_threshold": 85,
       "length": 12,
       "pattern": "^[0-9]{4}\\s?[0-9]{4}\\s?[0-9]{4}$",
       "mask_output": true
     },
     "issue_date": {
       "required": false,
-      "type": "date"
+      "type": "date",
+      "confidence_threshold": 75
     }
   },
   "layout": {
@@ -67,31 +73,38 @@
     "regions": {
       "government_logo": {
         "required": true,
-        "position": "top_left"
+        "position": "top_left",
+        "bounding_box": { "x": 5.0, "y": 5.0, "width": 15.0, "height": 15.0 }
       },
       "aadhaar_logo": {
         "required": true,
-        "position": "top_right"
+        "position": "top_right",
+        "bounding_box": { "x": 80.0, "y": 5.0, "width": 15.0, "height": 15.0 }
       },
       "government_header": {
         "required": true,
-        "position": "top_center"
+        "position": "top_center",
+        "bounding_box": { "x": 25.0, "y": 5.0, "width": 50.0, "height": 15.0 }
       },
       "photo": {
         "required": true,
-        "position": "left_center"
+        "position": "left_center",
+        "bounding_box": { "x": 5.0, "y": 30.0, "width": 25.0, "height": 40.0 }
       },
       "personal_details": {
         "required": true,
-        "position": "right_center"
+        "position": "right_center",
+        "bounding_box": { "x": 35.0, "y": 30.0, "width": 60.0, "height": 40.0 }
       },
       "verification_notice": {
         "required": true,
-        "position": "middle_right"
+        "position": "middle_right",
+        "bounding_box": { "x": 50.0, "y": 70.0, "width": 45.0, "height": 10.0 }
       },
       "aadhaar_number": {
         "required": true,
-        "position": "bottom_center"
+        "position": "bottom_center",
+        "bounding_box": { "x": 20.0, "y": 80.0, "width": 60.0, "height": 15.0 }
       }
     },
     "alignment_tolerance_px": 8,
@@ -226,6 +239,7 @@
         "max": 59
       }
     },
+    "critical_failure_behavior": "force_likely_fake",
     "critical_failures": [
       "invalid_qr",
       "major_ocr_mismatch",

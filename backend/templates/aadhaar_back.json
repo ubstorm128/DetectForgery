@@ -11,7 +11,7 @@
     "mask_sensitive_data": true
   },
   "ocr": {
-    "engine": "tesseract",
+    "engine": "paddleocr",
     "languages": ["eng", "hin"],
     "confidence_threshold": 75,
     "detect_text_regions": true,
