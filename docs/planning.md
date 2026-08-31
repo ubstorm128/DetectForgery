@@ -1,4 +1,4 @@
-# Veristamp: AI-Based Fake Identity & Document Screening System
+# Veristamp: AI-Based Fake Identity & Document Screening System (v3)
 **PS ID:** 26188 | **Org:** Ministry of Home Affairs — SSB, Police II Division | **Theme:** Blockchain & Cybersecurity
 
 ---
@@ -6,13 +6,12 @@
 ## 1. Scope
 
 **In scope**
-- Screening identity documents (Passports, Aadhaar, etc.) for tampering/forgery.
-- Template-driven configuration system (`backend/templates/*.json`) supporting custom fields, layouts, and validation rules for any new document type.
-- OCR text extraction (Tesseract) and geometric alignment mapping.
-- Visual tampering detection: Error Level Analysis (ELA), ORB Copy-Move detection, Compression analysis (DCT), Metadata checks.
-- Dual-side cross-verification for smart cards (e.g. comparing Aadhaar Front vs Aadhaar Back OCR to detect spoofing).
-- Explainable output dashboard: 0-100 Authenticity Score with category classification (Genuine, Suspicious, Likely Fake) + bounding boxes highlighting flagged regions.
-- High privacy standards: No full sensitive IDs permanently stored in logs (automatic masking).
+- Automated identity document detection and classification via YOLO models.
+- Deep OCR text extraction and spatial coordinate mapping using PaddleOCR.
+- Layout and geometry heuristics to detect typographical offsets, spacing errors, and scaling anomalies without requiring Neural Network training.
+- Visual tampering detection: Error Level Analysis (ELA), ORB Copy-Move detection, noise variance, and Metadata checks.
+- Explainable output dashboard: 0-100 Authenticity Score with category classification (Genuine, Suspicious, Likely Fake) + bounding boxes highlighting flagged layout regions.
+- High privacy standards: No full sensitive IDs permanently stored in logs (automatic masking capability).
 
 **Out of scope (say this explicitly to judges)**
 - Visa issuance workflows or full immigration management systems.
@@ -25,12 +24,12 @@
 
 | Layer | Choice | Why |
 |---|---|---|
-| OCR / doc extraction | Tesseract OCR | Pretrained, reliable, lightweight. |
-| Configuration System | JSON Templates | Allows adding new document types without code changes. |
-| Tamper/splice detection | Error Level Analysis (ELA), ORB Copy-Move (OpenCV) | Classical CV isolates splices and clones without massive GPU requirements. |
-| Backend | FastAPI | Minimal boilerplate, async, auto docs. |
-| Frontend | HTML/CSS/JS (SPA) | Fully responsive SaaS landing page format embedded with the screening tool; highly maintainable. No React boilerplate required. |
-| Scoring Engine | Unified Python Scoring logic | Weights disparate forensic signals into an actionable 0-100 score. |
+| Classification & Cropping | Ultralytics YOLO | High-speed detection of document boundaries and type classification. |
+| OCR / Text extraction | PaddleOCR | Highly accurate multilingual support (Hindi/English) and precise spatial bounding boxes. |
+| Validation Rules | Deterministic Heuristics | Spatial coordinate rules (`layout_analysis.py`) avoid black-box ML bias. |
+| Tamper/splice detection | Error Level Analysis (ELA), ORB Copy-Move | Classical CV isolates splices and clones without massive GPU requirements. |
+| Backend | FastAPI | Minimal boilerplate, async, auto docs. Serves both the REST API and the static frontend. |
+| Frontend | HTML/CSS/JS (Vanilla) | Fully responsive SaaS landing page format embedded with the screening tool; highly maintainable. |
 
 ---
 
@@ -41,19 +40,19 @@ Upload Image (Frontend SPA)
        │
        ▼
 ┌──────────────┐
-│  FastAPI API │ (/api/analyze-image)
+│  FastAPI API │ (POST /api/verify)
 └──────┬───────┘
        ▼
 ┌─────────────────────────────────┐
-│ Template Config System (JSON)   │ Load layout/rules for Aadhaar/Passport
+│ AI Detection & Classification   │ (YOLO Models)
 └──────┬──────────────────────────┘
        │
        ├─────────────────────────────────┐
        ▼                                 ▼
 ┌─────────────┐                   ┌─────────────┐
-│  OCR & Geo   │                   │ Tamper      │
-│  Extraction  │                   │ Detection   │
-│ (Tesseract)  │                   │ (ELA, ORB)  │
+│  PaddleOCR  │                   │ Tamper      │
+│  Extraction │                   │ Detection   │
+│ & Layout    │                   │ (ELA, ORB)  │
 └──────┬───────┘                   └─────┬───────┘
        │                                 │
        ▼                                 ▼
@@ -62,50 +61,34 @@ Upload Image (Frontend SPA)
 └──────────────────────┬────────────────────────┘
                        ▼
 ┌───────────────────────────────────────────────┐
-│            Dual-Side Cross Match              │ (/api/compare-sides)
-│ (If Aadhaar front and back are both provided) │
-└──────────────────────┬────────────────────────┘
-                       ▼
-┌───────────────────────────────────────────────┐
-│       Frontend Dashboard Visualization        │ (Bounding boxes, scores)
+│       Frontend Dashboard Visualization        │ (Bounding boxes, visual dashboard)
 └───────────────────────────────────────────────┘
 ```
 
-The system uses a completely decoupled frontend (`index.html` + `/static/`) interacting with a unified FastAPI backend. No complex service mesh needed.
+The system uses a tightly coupled but cleanly separated frontend (`index.html` + `script.js`) interacting with a unified FastAPI backend that mounts the static files alongside the `/api` routes. 
 
 ---
 
 ## 4. Workflows
 
-**Single-Sided Document (Passport):**
-1. User selects "Passport", uploads image.
-2. System extracts data, runs ELA/ORB.
-3. System returns Authenticity Score & visual maps.
-
-**Dual-Sided Document (Aadhaar):**
-1. User selects "Aadhaar", uploads Front.
-2. System detects it is the Front via heuristic checks, temporarily caches data in frontend state, prompts for Back.
-3. User uploads Back. System analyzes Back.
-4. Frontend triggers cross-match verification `/api/compare-sides` to ensure the text (e.g. name, UID) matches on both sides.
-5. Consolidated score is presented.
+**Single-Sided Document (Aadhaar / Passport):**
+1. User uploads the image.
+2. The `POST /api/verify` pipeline executes:
+   - **YOLO:** Detects the document and crops it.
+   - **YOLO:** Classifies the document type (e.g. Aadhaar vs PAN).
+   - **Pre-processing:** Image quality assessment and perspective correction.
+   - **PaddleOCR:** Extracts Hindi/English text and exact geometry.
+   - **Layout Analysis:** Checks coordinates against authentic templates.
+   - **Forensics:** Checks for ELA and ORB copy-move manipulation.
+3. System aggregates the components into a `final_score` (0-100) and assigns a status (`likely_valid`, `suspicious`, `likely_fake`).
+4. Frontend visualizes the score, detailed breakdown, and exact explainable reasons.
 
 ---
 
 ## 5. Build & Demo Narrative
 
-1. **The Modern Interface:** Show off the sleek Veristamp SaaS interface. Emphasize it's designed for border control agents (trust-inspiring).
+1. **The Modern Interface:** Show off the sleek Veristamp SaaS interface. Emphasize it's designed for quick security checks.
 2. **Standard Scan:** Upload a clean document. Show all checks passing (Genuine).
-3. **The Forgery:** Upload a manipulated document (e.g. tampered photo, spliced text). Show ELA and ORB flagging the exact region, resulting in a low score (Likely Fake).
-4. **The Smart Card Spoof:** Show the Aadhaar Dual-Side feature. Upload a Front, then upload a mismatched Back. The cross-match will fail, catching the spoof attempt.
-5. **Privacy:** Note that no PII is retained on disk and sensitive digits are masked in the backend.
-
----
-
-## 6. Team Roles
-
-| Role | Owns |
-|---|---|
-| Architect / Fullstack | FastAPI routes, Frontend UI styling, state management (Dual-sided flow). |
-| CV / Forensics | OpenCV integration, ELA tuning, ORB algorithms, metadata parsing. |
-| OCR / Pipeline | Tesseract integration, Template configuration mappings. |
-| Pitch / Product | Demo flow, slides, narrative, dataset curation. |
+3. **The Forgery:** Upload a manipulated document (e.g. tampered text, layout shifting). Show the layout spatial rules catching the offset and flagging the exact region, resulting in a low score (Likely Fake).
+4. **Transparency:** Point out the "Explainable Reasoning" list that proves the system isn't just a black box guessing.
+5. **Privacy:** Note that no PII is retained on disk after analysis completes.

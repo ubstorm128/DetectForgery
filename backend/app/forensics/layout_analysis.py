@@ -5,13 +5,14 @@ alignment verification, spacing consistency, region structure, and confidence-aw
 """
 
 import os
+import json
 import cv2
 import numpy as np
 
-from services.perspective import correct_perspective_and_normalize
-from services.ocr_service import extract_ocr_data
-from services.similarity import compute_structural_ssim, compare_structural_edges
-from services.preprocessing import preprocess_image_for_analysis
+from app.preprocessing.perspective import correct_perspective_and_normalize
+from app.ocr.paddleocr_engine import extract_ocr_data
+from app.preprocessing.similarity import compute_structural_ssim, compare_structural_edges
+from app.preprocessing.image_utils import preprocess_image_for_analysis
 
 
 # Configurable Tolerances for Normalized Coordinates (0.0 to 1.0)
@@ -240,7 +241,8 @@ def calculate_spacing_consistency(
 def evaluate_region_structure(
     boxes: list[dict],
     detected_side: str = "front",
-    gray_image: np.ndarray | None = None
+    gray_image: np.ndarray | None = None,
+    document_type: str = "aadhaar"
 ) -> tuple[float, list[str]]:
     """
     Validates presence and correct relative spatial zones for expected regions
@@ -249,9 +251,14 @@ def evaluate_region_structure(
     import json
     regions_def = FRONT_REGIONS if detected_side == "front" else BACK_REGIONS
     
-    # Try to load regions from the specific template JSON
+    # Try to load regions from the specific template JSON based on the AI-classified document type
     try:
-        template_file = f"templates/aadhaar.json"
+        import os
+        backend_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
+        # Using a default of "aadhaar" if None is passed, but realistically it's the AI's classification
+        doc_type_key = document_type if document_type else "aadhaar"
+        template_file = os.path.join(backend_dir, "config", "documents", f"{doc_type_key}.json")
+        
         with open(template_file, "r") as f:
             template_config = json.load(f)
             
@@ -405,7 +412,7 @@ def perform_layout_analysis(
     size_score, size_warnings = calculate_size_consistency(matched_pairs, SIZE_TOLERANCE)
     align_score, align_warnings = calculate_alignment_consistency(uploaded_boxes, ALIGNMENT_TOLERANCE)
     spacing_score, spacing_warnings = calculate_spacing_consistency(uploaded_boxes, SPACING_TOLERANCE)
-    region_score, region_warnings = evaluate_region_structure(uploaded_boxes, detected_side, gray_image=processed_gray)
+    region_score, region_warnings = evaluate_region_structure(uploaded_boxes, detected_side, gray_image=processed_gray, document_type=document_type)
 
     # 5. Dedicated Structural Formula:
     # Position: 35%, Size: 20%, Alignment: 20%, Spacing: 15%, Region Structure: 10%
@@ -444,10 +451,13 @@ def perform_layout_analysis(
     # NEW: STRICT TEMPLATE MATCHING LOGIC
     major_layout_mismatch = False
     
-    import json
     template_config = {}
     try:
-        with open("templates/aadhaar.json", "r") as f:
+        backend_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
+        doc_type_key = document_type if document_type else "aadhaar"
+        template_file = os.path.join(backend_dir, "config", "documents", f"{doc_type_key}.json")
+        
+        with open(template_file, "r") as f:
             template_config = json.load(f).get(f"{detected_side}_side", {})
     except Exception:
         pass

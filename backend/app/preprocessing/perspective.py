@@ -5,7 +5,7 @@ Transforms distorted/skewed document captures into standardized rectangular coor
 
 import cv2
 import numpy as np
-from services.document_detection import detect_document_corners
+from app.models.legacy_document_detection import detect_document_corners
 
 
 def correct_perspective_and_normalize(

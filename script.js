@@ -177,7 +177,8 @@ function showCustomPopup(title, message, type = 'alert', confirmText = 'OK', can
 async function handleFile(file) {
     if (!file) return;
     
-    const docType = document.getElementById('document-type').value;
+    // Automatically detected by backend, send 'auto'
+    const docType = "auto";
     
     document.getElementById('section-upload').classList.add('hidden');
     document.getElementById('section-results').classList.add('hidden');
@@ -225,7 +226,7 @@ async function handleFile(file) {
     formData.append('document_type', docType);
     
     try {
-        const response = await fetch(`${API_BASE}/api/analyze-image`, {
+        const response = await fetch(`${API_BASE}/api/verify`, {
             method: 'POST',
             body: formData
         });
@@ -233,16 +234,23 @@ async function handleFile(file) {
         
         clearInterval(interval);
         
-        if (data.error === "CARD_NOT_DETECTED" || data.status === "REJECTED") {
-            if (data.debug_log) {
-                console.warn("Card Detection Failed:");
-                data.debug_log.forEach(log => console.warn("  " + log));
-            }
+        if (!data.success || data.result?.status === "no_supported_document" || data.error) {
             await showCustomPopup(
                 "ID Card Not Detected",
-                data.reason || "Please upload a clear image of a supported ID card to continue verification.",
+                data.result?.message || data.reason || "No supported identity document detected. Please upload a clear image of the document.",
                 "alert",
                 "Upload ID Card"
+            );
+            resetToUploadState("Click to browse or drag and drop");
+            return;
+        }
+
+        if (data.aadhaar_verification?.status === "not_applicable") {
+            await showCustomPopup(
+                "Document Detected",
+                data.aadhaar_verification.message,
+                "alert",
+                "OK"
             );
             resetToUploadState("Click to browse or drag and drop");
             return;
@@ -291,24 +299,24 @@ function showResults(data, file) {
     const classEl = document.getElementById('classification');
     const confEl = document.getElementById('confidence-indicator');
     
-    const finalScore = data.overall_score !== undefined ? data.overall_score : (data.authenticity_score || 0);
-    const resultType = (data.result || "SUSPICIOUS").toLowerCase();
+    const finalScore = data.result?.score !== undefined ? data.result.score * 100 : 0;
+    const resultType = (data.result?.status || "SUSPICIOUS").toLowerCase();
     
-    scoreEl.textContent = finalScore;
+    scoreEl.textContent = Math.round(finalScore);
     scoreCont.className = 'score-header ' + resultType;
-    classEl.textContent = data.risk_level || data.result.replace('_', ' ').toUpperCase();
+    classEl.textContent = data.result?.status.replace('_', ' ').toUpperCase() || 'UNKNOWN';
     
-    if (confEl && data.confidence !== undefined) {
-        confEl.textContent = `Confidence: ${Math.round(data.confidence * 100)}%`;
+    if (confEl && data.document?.confidence !== undefined) {
+        confEl.textContent = `Confidence: ${Math.round(data.document.confidence * 100)}%`;
     }
 
     // Populate Separated Image Quality Card
     if (data.image_quality) {
-        const qScore = data.image_quality.score || 85;
-        document.getElementById('quality-score-val').textContent = `${qScore}/100`;
-        document.getElementById('chip-sharpness').textContent = `Sharpness: ${data.image_quality.sharpness || '--'}`;
-        document.getElementById('chip-brightness').textContent = `Brightness: ${data.image_quality.brightness || '--'}`;
-        document.getElementById('chip-contrast').textContent = `Contrast: ${data.image_quality.contrast || '--'}`;
+        const qScore = data.image_quality.score !== undefined ? data.image_quality.score * 100 : 85;
+        document.getElementById('quality-score-val').textContent = `${Math.round(qScore)}/100`;
+        document.getElementById('chip-sharpness').textContent = `Quality: ${data.image_quality.status || '--'}`;
+        document.getElementById('chip-brightness').textContent = `Contrast: --`;
+        document.getElementById('chip-contrast').textContent = `Sharpness: --`;
     }
     
     // Display Aadhaar Number
@@ -350,68 +358,34 @@ function showResults(data, file) {
     list.innerHTML = '';
     
     const checksOrder = [
-        { key: 'layout', name: 'Layout & Formatting' },
-        { key: 'ocr', name: 'OCR / Text Consistency' },
-        { key: 'tampering', name: 'Image Manipulation (ELA)' },
-        { key: 'copy_move', name: 'Copy-Move Analysis' },
-        { key: 'compression', name: 'Compression (DCT)' },
-        { key: 'geometry', name: 'Document Geometry' },
-        { key: 'metadata', name: 'Metadata & EXIF' }
+        { key: 'layout', name: 'Layout & Formatting', scorePath: data.validation?.layout },
+        { key: 'ocr', name: 'OCR / Text Consistency', scorePath: data.validation?.text },
+        { key: 'security', name: 'Security Features', scorePath: data.validation?.security_features },
+        { key: 'manipulation', name: 'Digital Manipulation Analysis', scorePath: data.manipulation_analysis?.score }
     ];
     
-    if (data.checks) {
-        checksOrder.forEach(c => {
-            const checkResult = data.checks[c.key];
-            if (checkResult) {
-                const li = document.createElement('li');
-                li.className = 'check-item';
-                const score = checkResult.score !== undefined ? checkResult.score : 0;
-                const scoreClass = score >= 85 ? 'score-safe' : 'score-warn';
-                
-                let detailsButton = '';
-                if (c.key === 'layout') {
-                    detailsButton = `<button class="btn-details" onclick="openLayoutModal()">View Details</button>`;
-                }
-                
-                if (c.key === 'copy_move') {
-                    const risk = checkResult.risk !== undefined ? checkResult.risk : (100 - score);
-                    const integrity = checkResult.integrity !== undefined ? checkResult.integrity : score;
-                    const message = risk < 30 ? '✓ No suspicious copy-move evidence detected' : '⚠ Suspicious duplicated region detected';
-                    const msgColor = risk < 30 ? 'var(--success)' : 'var(--danger)';
-                    
-                    li.innerHTML = `
-                        <div style="width: 100%;">
-                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
-                                <span class="check-name" style="font-weight: 600;">${c.name}</span>
-                                <div style="display: flex; gap: 1rem;">
-                                    <div style="text-align: right;">
-                                        <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;">Risk</div>
-                                        <div style="font-weight: 700; color: ${risk < 30 ? 'var(--success)' : 'var(--danger)'};">${risk}%</div>
-                                    </div>
-                                    <div style="text-align: right;">
-                                        <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;">Integrity</div>
-                                        <div style="font-weight: 700; color: ${integrity >= 85 ? 'var(--success)' : 'var(--danger)'};">${integrity}%</div>
-                                    </div>
-                                </div>
-                            </div>
-                            <div style="font-size: 0.8rem; padding: 0.25rem 0; color: ${msgColor};">${message}</div>
-                        </div>
-                    `;
-                    li.style.flexDirection = "column";
-                    li.style.alignItems = "flex-start";
-                } else {
-                    li.innerHTML = `
-                        <span class="check-name">${c.name}</span>
-                        <div class="check-score-col">
-                            <span class="check-score ${scoreClass}">${score}%</span>
-                            ${detailsButton}
-                        </div>
-                    `;
-                }
-                list.appendChild(li);
+    checksOrder.forEach(c => {
+        if (c.scorePath !== undefined) {
+            const li = document.createElement('li');
+            li.className = 'check-item';
+            const score = Math.round(c.scorePath * 100);
+            const scoreClass = score >= 85 ? 'score-safe' : 'score-warn';
+            
+            let detailsButton = '';
+            if (c.key === 'layout') {
+                detailsButton = `<button class="btn-details" onclick="openLayoutModal()">View Details</button>`;
             }
-        });
-    }
+            
+            li.innerHTML = `
+                <span class="check-name">${c.name}</span>
+                <div class="check-score-col">
+                    <span class="check-score ${scoreClass}">${score}%</span>
+                    ${detailsButton}
+                </div>
+            `;
+            list.appendChild(li);
+        }
+    });
     
     // Populate Explainable Reasoning List
     const reasonsList = document.getElementById('reasons-list');

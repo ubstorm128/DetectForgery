@@ -1,32 +1,31 @@
-# Veristamp Setup
+# Veristamp Setup (v3.0.0)
 
-Covers running the Veristamp document screening system locally on Windows.
+Covers running the Veristamp AI Document Screening system locally on Windows.
 
 ## Prerequisites
 
 - Python 3.10+
-- Tesseract OCR (system-level, not just the Python wrapper)
-  - Windows: install from https://github.com/UB-Mannheim/tesseract/wiki, then make sure `tesseract.exe` is on PATH
-  - Verify with: `tesseract --version`
+- Microsoft Visual C++ Redistributable (Required for PaddleOCR and OpenCV)
 
 ## Install dependencies
 
 Run from the `backend/` folder:
 
 ```powershell
-python -m pip install fastapi uvicorn pytesseract pillow python-multipart opencv-python
+python -m pip install fastapi uvicorn pillow python-multipart opencv-python ultralytics paddleocr paddlepaddle
 ```
 
 Use `python -m pip` (not bare `pip`) — guarantees packages install into the same Python that will run the server. Mismatched environments are the most common cause of "module not found" errors later.
 
 ## Run the server
 
+The easiest way to run the server and automatically launch the website is to double-click the `start.bat` file in the root directory.
+
+Alternatively, you can run it manually via PowerShell:
 ```powershell
 cd "e:\SIH 2026\DetectForgery\backend"
-python -m uvicorn main:app --reload
+python -m uvicorn app.main:app --reload
 ```
-
-Use `python -m uvicorn` instead of the bare `uvicorn` command — on Windows, pip-installed script shims often aren't on PATH even when the package itself is installed correctly. `python -m` sidesteps that by invoking it through the interpreter directly.
 
 ## Usage
 
@@ -35,15 +34,13 @@ Use `python -m uvicorn` instead of the bare `uvicorn` command — on Windows, pi
 
 ## Endpoints
 
-- `POST /api/analyze-image`: Upload an image and a document type (e.g. `passport`, `aadhaar`) to run ELA, ORB Copy-Move, and OCR analysis.
-- `POST /api/compare-sides`: Used for dual-sided documents like Aadhaar. Accepts front and back OCR text and scores to perform a cross-match verification.
-- `GET /api/templates`: Lists available document templates from `backend/templates/`.
+- `POST /api/verify`: Upload an image to run YOLO detection/classification, layout analysis, PaddleOCR text extraction, ELA, ORB Copy-Move, and noise analysis. Returns a consolidated 0-100 authenticity score.
 
 ## Troubleshooting
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| `uvicorn: command not found` | Scripts folder not on PATH | Use `python -m uvicorn main:app --reload` |
-| UI missing styles | Incorrect path to static files | Ensure `index.html` is in the root directory and `static/styles.css` is intact. |
-| `ModuleNotFoundError` | `pip install` and `python` are different environments | Re-run install with `python -m pip install ...`, not bare `pip install ...` |
-| Tesseract errors (`TesseractNotFoundError`) | Tesseract binary not on PATH | Confirm `tesseract --version` works in the same terminal |
+| Server completely crashes (silent exit code 1) during analysis | PaddleOCR Out-of-Memory (OOM) | High-resolution images upscaled by 2x cause C++ segfaults. Ensure the image width/height check (`max(h,w) < 1200`) in `paddleocr_engine.py` is intact. |
+| `uvicorn: command not found` | Scripts folder not on PATH | Use `python -m uvicorn app.main:app --reload` |
+| UI missing styles | Incorrect path to static files | Ensure `start.bat` sets the working directory correctly using `cd /d "%~dp0"`. |
+| YOLO mock mode warning | Missing weights | YOLO models are currently running in mock fallback mode (`model_path=None`). Train and provide weights for production. |
