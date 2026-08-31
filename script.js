@@ -53,7 +53,7 @@ async function loadTemplates() {
             if (templates.includes('aadhaar_front')) {
                 const opt = document.createElement('option');
                 opt.value = 'aadhaar';
-                opt.textContent = 'Aadhaar (Dual Sided)';
+                opt.textContent = 'Aadhaar Card';
                 select.appendChild(opt);
             }
         }
@@ -237,6 +237,10 @@ async function handleFile(file) {
         clearInterval(interval);
         
         if (data.error === "CARD_NOT_DETECTED") {
+            if (data.debug_log) {
+                console.warn("Card Detection Failed:");
+                data.debug_log.forEach(log => console.warn("  " + log));
+            }
             await showCustomPopup(
                 "ID Card Not Detected",
                 "Please upload a clear image of a supported ID card to continue verification.",
@@ -254,51 +258,7 @@ async function handleFile(file) {
             if (l) l.textContent = '100%';
         });
         
-        if (docType === 'aadhaar') {
-            // Dual-sided logic
-            if (data.detected_side === 'front') {
-                frontData = data;
-                frontFile = file;
-                if (!backData) {
-                    await showCustomPopup("Side Detected", "Detected: Aadhaar FRONT.\nPlease upload the BACK side now.");
-                    resetToUploadState("Upload Aadhaar BACK Side");
-                }
-            } else if (data.detected_side === 'back') {
-                backData = data;
-                if (!frontData) {
-                    await showCustomPopup("Side Detected", "Detected: Aadhaar BACK.\nPlease upload the FRONT side now.");
-                    resetToUploadState("Upload Aadhaar FRONT Side");
-                }
-            } else {
-                // If side ambiguous, allow user confirmation
-                const isFront = await showCustomPopup(
-                    "Ambiguous Side", 
-                    "Detected side could not be 100% distinguished.\nIs this the FRONT side?", 
-                    "confirm", 
-                    "Yes, Front", 
-                    "No, Back"
-                );
-                
-                if (isFront) {
-                    frontData = data;
-                    frontFile = file;
-                    if (!backData) {
-                        resetToUploadState("Upload Aadhaar BACK Side");
-                    }
-                } else {
-                    backData = data;
-                    if (!frontData) {
-                        resetToUploadState("Upload Aadhaar FRONT Side");
-                    }
-                }
-            }
-            
-            if (frontData && backData) {
-                performCrossCheck();
-            }
-        } else {
-            setTimeout(() => showResults(data, file), 400);
-        }
+        setTimeout(() => showResults(data, file), 400);
         
     } catch (err) {
         alert('Error analyzing document. Please ensure the backend server is running.');
@@ -424,7 +384,7 @@ function showResults(data, file, extraAnomalies=[]) {
     // Display Aadhaar Number
     let aadhaarEl = document.getElementById('aadhaar-number-display');
     
-    if (data.matched_aadhaar || data.front_number !== undefined || data.back_number !== undefined) {
+    if (data.matched_aadhaar || data.front_number !== undefined || data.back_number !== undefined || (data.ocr && data.ocr.aadhaar_number)) {
         if (!aadhaarEl) {
             aadhaarEl = document.createElement('div');
             aadhaarEl.id = 'aadhaar-number-display';
@@ -444,8 +404,8 @@ function showResults(data, file, extraAnomalies=[]) {
         
         const cardName = (data.card_type || "Aadhaar").toUpperCase();
         
-        if (data.matched_aadhaar || (data.comparison && data.comparison.status === "MATCH")) {
-            const num = data.matched_aadhaar || data.front_number;
+        if (data.matched_aadhaar || (data.comparison && data.comparison.status === "MATCH") || (data.ocr && data.ocr.aadhaar_number)) {
+            const num = data.matched_aadhaar || data.front_number || (data.ocr && data.ocr.aadhaar_number);
             const formatted = num.replace(/(.{4})/g, '$1 ').trim();
             aadhaarEl.innerHTML = `${cardName} NUMBER: <span style="font-size: 1.1rem; letter-spacing: 2px;">${formatted}</span>`;
             aadhaarEl.style.backgroundColor = 'rgba(59, 130, 246, 0.1)';

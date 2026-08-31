@@ -3,27 +3,34 @@
     "type": "aadhaar",
     "country": "IN",
     "language": ["en", "hi"],
-    "version": "standard"
+    "version": "standard",
+    "template_verification": true,
+    "strict_template_matching": true
   },
+
   "privacy": {
     "store_full_aadhaar_number": false,
     "mask_aadhaar_number_in_results": true,
     "store_uploaded_image": false,
     "processing_mode": "in_memory_only",
-    "_comment_processing": "Images are processed transiently in memory for analysis (ELA, etc.) and discarded after the pipeline runs, never persisted to disk or DB.",
     "log_extracted_pii": false
   },
+
   "ocr": {
     "engine": "paddleocr",
     "languages": ["eng", "hin"],
     "confidence_threshold": 75,
-    "_comment_threshold": "Per-field confidence thresholds in the 'fields' section override this global default.",
     "detect_text_regions": true,
     "detect_font_anomalies": true,
     "detect_text_alignment": true,
     "detect_spacing_anomalies": true,
-    "detect_baseline_anomalies": true
+    "detect_baseline_anomalies": true,
+    "detect_text_presence": true,
+    "detect_text_position": true,
+    "detect_text_size": true,
+    "detect_text_order": true
   },
+
   "fields": {
     "name": {
       "required": true,
@@ -32,6 +39,7 @@
       "allow_hindi": true,
       "allow_english": true
     },
+
     "date_of_birth": {
       "required": true,
       "type": "date",
@@ -41,6 +49,7 @@
         "DD-MM-YYYY"
       ]
     },
+
     "gender": {
       "required": true,
       "case_insensitive": true,
@@ -51,6 +60,7 @@
         "Other"
       ]
     },
+
     "aadhaar_number": {
       "required": true,
       "type": "numeric",
@@ -59,111 +69,374 @@
       "pattern": "^[0-9]{4}\\s?[0-9]{4}\\s?[0-9]{4}$",
       "mask_output": true
     },
+
     "issue_date": {
       "required": false,
       "type": "date",
       "confidence_threshold": 75
     }
   },
-  "layout": {
-    "expected_aspect_ratio": {
-      "min": 1.45,
-      "max": 1.65
+
+  "card_normalization": {
+    "enabled": true,
+
+    "purpose": "Normalize perspective, rotation and scale before template comparison.",
+
+    "detect_card_boundary": true,
+
+    "perspective_correction": {
+      "enabled": true,
+      "detect_four_corners": true,
+      "max_corner_error_percent": 3
     },
+
+    "rotation_correction": {
+      "enabled": true,
+      "max_rotation_degrees": 10
+    },
+
+    "normalized_size": {
+      "width": 1500,
+      "height": 950
+    },
+
+    "aspect_ratio": {
+      "expected": 1.5789,
+      "tolerance": 0.08
+    }
+  },
+
+  "layout": {
+    "strict": true,
+
+    "expected_aspect_ratio": {
+      "min": 1.50,
+      "max": 1.66
+    },
+
+    "coordinate_system": {
+      "type": "normalized",
+      "x_range": [0, 100],
+      "y_range": [0, 100],
+      "origin": "top_left"
+    },
+
+    "global_position_tolerance_percent": 3,
+
+    "global_size_tolerance_percent": 8,
+
+    "global_alignment_tolerance_px": 8,
+
+    "rotation_tolerance_degrees": 3,
+
+    "required_element_count": 8,
+
     "regions": {
-      "government_logo": {
+
+      "government_emblem": {
         "required": true,
+        "type": "logo",
         "position": "top_left",
-        "bounding_box": { "x": 5.0, "y": 5.0, "width": 15.0, "height": 15.0 }
+        "bounding_box": {
+          "x": 5,
+          "y": 2,
+          "width": 12,
+          "height": 17
+        },
+        "position_tolerance_percent": 3,
+        "size_tolerance_percent": 10,
+        "presence_threshold": 0.80
       },
+
+      "government_hindi_header": {
+        "required": true,
+        "type": "text",
+        "position": "top_center",
+        "bounding_box": {
+          "x": 22,
+          "y": 3,
+          "width": 43,
+          "height": 7
+        },
+        "position_tolerance_percent": 3,
+        "size_tolerance_percent": 12,
+        "presence_threshold": 0.80
+      },
+
+      "government_english_header": {
+        "required": true,
+        "type": "text",
+        "position": "top_center",
+        "bounding_box": {
+          "x": 22,
+          "y": 9,
+          "width": 50,
+          "height": 8
+        },
+        "position_tolerance_percent": 3,
+        "size_tolerance_percent": 12,
+        "presence_threshold": 0.80
+      },
+
       "aadhaar_logo": {
         "required": true,
+        "type": "logo",
         "position": "top_right",
-        "bounding_box": { "x": 80.0, "y": 5.0, "width": 15.0, "height": 15.0 }
+        "bounding_box": {
+          "x": 80,
+          "y": 2,
+          "width": 15,
+          "height": 18
+        },
+        "position_tolerance_percent": 3,
+        "size_tolerance_percent": 10,
+        "presence_threshold": 0.80
       },
-      "government_header": {
-        "required": true,
-        "position": "top_center",
-        "bounding_box": { "x": 25.0, "y": 5.0, "width": 50.0, "height": 15.0 }
-      },
+
       "photo": {
         "required": true,
+        "type": "photo",
         "position": "left_center",
-        "bounding_box": { "x": 5.0, "y": 30.0, "width": 25.0, "height": 40.0 }
+        "bounding_box": {
+          "x": 9,
+          "y": 21,
+          "width": 20,
+          "height": 39
+        },
+        "position_tolerance_percent": 3,
+        "size_tolerance_percent": 8,
+        "presence_threshold": 0.85,
+        "detect_replacement": true,
+        "detect_boundary_anomalies": true
       },
+
       "personal_details": {
         "required": true,
+        "type": "text_block",
         "position": "right_center",
-        "bounding_box": { "x": 35.0, "y": 30.0, "width": 60.0, "height": 40.0 }
+        "bounding_box": {
+          "x": 32,
+          "y": 21,
+          "width": 62,
+          "height": 25
+        },
+        "position_tolerance_percent": 3,
+        "size_tolerance_percent": 10,
+        "presence_threshold": 0.80
       },
+
       "verification_notice": {
         "required": true,
+        "type": "text_block",
         "position": "middle_right",
-        "bounding_box": { "x": 50.0, "y": 70.0, "width": 45.0, "height": 10.0 }
+        "bounding_box": {
+          "x": 33,
+          "y": 42,
+          "width": 62,
+          "height": 31
+        },
+        "position_tolerance_percent": 3,
+        "size_tolerance_percent": 10,
+        "presence_threshold": 0.80
       },
+
       "aadhaar_number": {
         "required": true,
+        "type": "numeric_text",
         "position": "bottom_center",
-        "bounding_box": { "x": 20.0, "y": 80.0, "width": 60.0, "height": 15.0 }
+        "bounding_box": {
+          "x": 30,
+          "y": 77,
+          "width": 40,
+          "height": 9
+        },
+        "position_tolerance_percent": 3,
+        "size_tolerance_percent": 8,
+        "presence_threshold": 0.90
+      },
+
+      "bottom_tagline": {
+        "required": true,
+        "type": "text",
+        "position": "bottom_center",
+        "bounding_box": {
+          "x": 20,
+          "y": 90,
+          "width": 60,
+          "height": 8
+        },
+        "position_tolerance_percent": 3,
+        "size_tolerance_percent": 12,
+        "presence_threshold": 0.80
       }
     },
-    "alignment_tolerance_px": 8,
-    "rotation_tolerance_degrees": 3
+
+    "element_order": {
+      "enabled": true,
+      "strict": true,
+
+      "expected_order": [
+        "government_emblem",
+        "government_hindi_header",
+        "government_english_header",
+        "aadhaar_logo",
+        "photo",
+        "personal_details",
+        "verification_notice",
+        "aadhaar_number",
+        "bottom_tagline"
+      ],
+
+      "if_order_changed": "major_layout_mismatch"
+    },
+
+    "relative_positions": {
+      "enabled": true,
+      "strict": true,
+
+      "rules": [
+        {
+          "element_a": "government_emblem",
+          "relation": "left_of",
+          "element_b": "government_hindi_header"
+        },
+        {
+          "element_a": "government_hindi_header",
+          "relation": "above",
+          "element_b": "government_english_header"
+        },
+        {
+          "element_a": "aadhaar_logo",
+          "relation": "right_of",
+          "element_b": "government_english_header"
+        },
+        {
+          "element_a": "photo",
+          "relation": "left_of",
+          "element_b": "personal_details"
+        },
+        {
+          "element_a": "personal_details",
+          "relation": "above",
+          "element_b": "verification_notice"
+        },
+        {
+          "element_a": "aadhaar_number",
+          "relation": "below",
+          "element_b": "verification_notice"
+        },
+        {
+          "element_a": "bottom_tagline",
+          "relation": "below",
+          "element_b": "aadhaar_number"
+        }
+      ]
+    },
+
+    "missing_element_behavior": {
+      "enabled": true,
+      "required_element_missing": "force_likely_fake",
+      "optional_element_missing": "reduce_score"
+    }
   },
+
+  "template_matching": {
+    "enabled": true,
+
+    "method": [
+      "feature_matching",
+      "structural_similarity",
+      "edge_map_comparison",
+      "layout_comparison",
+      "text_region_comparison",
+      "logo_region_comparison"
+    ],
+
+    "template_score": {
+      "minimum_for_genuine": 90,
+      "suspicious": 75,
+      "fake": 0
+    },
+
+    "strict_rules": {
+      "element_moved_significantly": "fail",
+      "element_missing": "fail",
+      "unexpected_element": "suspicious",
+      "wrong_element_order": "fail",
+      "wrong_region": "fail",
+      "major_size_difference": "fail",
+      "major_alignment_difference": "fail"
+    }
+  },
+
   "image_analysis": {
     "resolution": {
       "minimum_width": 800,
       "minimum_height": 500
     },
+
     "blur_detection": {
       "enabled": true,
       "minimum_laplacian_variance": 80
     },
+
     "noise_analysis": {
       "enabled": true,
       "detect_inconsistent_noise": true
     },
+
     "compression_analysis": {
       "enabled": true,
       "detect_jpeg_artifacts": true,
       "detect_inconsistent_compression": true
     },
+
     "ela": {
       "enabled": true,
       "quality": 90,
       "threshold": 25
     },
+
     "resampling_analysis": {
       "enabled": true,
       "detect_resized_regions": true,
       "detect_interpolation_artifacts": true
     },
+
     "edge_analysis": {
       "enabled": true,
       "detect_edge_inconsistency": true
     }
   },
+
   "tampering_detection": {
     "copy_move": {
       "enabled": true,
       "similarity_threshold": 0.85,
       "minimum_region_size": 500
     },
+
     "text_tampering": {
       "enabled": true,
       "compare_character_spacing": true,
       "compare_font_size": true,
       "compare_font_weight": true,
       "compare_text_color": true,
-      "compare_baseline": true
+      "compare_baseline": true,
+      "compare_text_region_position": true,
+      "compare_text_region_size": true
     },
+
     "number_tampering": {
       "enabled": true,
       "check_digit_shape": true,
       "check_spacing": true,
       "check_alignment": true,
-      "check_font_consistency": true
+      "check_font_consistency": true,
+      "check_position": true,
+      "check_region_size": true
     },
+
     "photo_tampering": {
       "enabled": true,
       "detect_replacement": true,
@@ -171,59 +444,91 @@
       "detect_resampling": true
     }
   },
+
   "qr_verification": {
     "enabled": true,
-    "detect_qr": true,
-    "decode_qr": true,
-    "validate_payload": true,
-    "compare_qr_with_ocr": true,
-    "compare_qr_with_document": true
+
+    "front_side": {
+      "qr_required": false,
+      "qr_missing_behavior": "ignore"
+    },
+
+    "back_side": {
+      "qr_required": true,
+      "detect_qr": true,
+      "decode_qr": true,
+      "validate_payload": true,
+      "compare_qr_with_ocr": true,
+      "compare_qr_with_document": true
+    }
   },
+
   "metadata": {
     "enabled": true,
     "extract_exif": true,
     "check_software_tag": true,
     "check_editing_software": true,
     "check_creation_date": true,
-    "check_modification_date": true
+    "check_modification_date": true,
+    "metadata_is_not_sole_decision_factor": true
   },
+
   "comparison": {
     "enabled": true,
+
     "checks": {
-      "ocr_vs_document": {
-        "enabled": true,
-        "weight": 20
-      },
-      "ocr_vs_qr": {
+      "template_layout": {
         "enabled": true,
         "weight": 25
       },
-      "layout": {
+
+      "element_position": {
         "enabled": true,
         "weight": 15
       },
-      "font_consistency": {
+
+      "element_presence": {
         "enabled": true,
         "weight": 10
       },
-      "image_tampering": {
+
+      "ocr_vs_document": {
         "enabled": true,
         "weight": 15
       },
+
+      "ocr_vs_qr": {
+        "enabled": true,
+        "weight": 10
+      },
+
+      "font_consistency": {
+        "enabled": true,
+        "weight": 5
+      },
+
+      "image_tampering": {
+        "enabled": true,
+        "weight": 8
+      },
+
       "compression": {
         "enabled": true,
-        "weight": 5
+        "weight": 3
       },
+
       "metadata": {
         "enabled": true,
-        "weight": 5
+        "weight": 2
       },
+
       "photo_analysis": {
         "enabled": true,
-        "weight": 5
+        "weight": 7
       }
     }
   },
+
   "decision": {
     "score_range": {
       "genuine": {
@@ -239,21 +544,48 @@
         "max": 59
       }
     },
+
     "critical_failure_behavior": "force_likely_fake",
+
     "critical_failures": [
       "invalid_qr",
       "major_ocr_mismatch",
       "major_layout_mismatch",
+      "missing_required_element",
+      "wrong_element_position",
+      "wrong_element_order",
       "strong_copy_move_detected",
-      "strong_text_tampering_detected"
-    ]
+      "strong_text_tampering_detected",
+      "major_template_mismatch"
+    ],
+
+    "strict_template_rule": {
+      "enabled": true,
+
+      "description": "All required template elements must be present and located within their expected normalized regions.",
+
+      "position_tolerance_percent": 3,
+
+      "if_element_outside_tolerance": "major_layout_mismatch",
+
+      "if_required_element_missing": "force_likely_fake",
+
+      "if_element_order_changed": "force_likely_fake",
+
+      "if_multiple_layout_mismatches": "force_likely_fake"
+    }
   },
+
   "output": {
     "show_score": true,
     "show_individual_checks": true,
     "show_suspicious_regions": true,
     "show_ocr_confidence": true,
     "show_tampering_heatmap": true,
+    "show_template_comparison": true,
+    "show_missing_elements": true,
+    "show_moved_elements": true,
+    "show_layout_difference": true,
     "mask_sensitive_data": true
   }
 }

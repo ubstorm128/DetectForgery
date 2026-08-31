@@ -143,10 +143,17 @@ def calculate_overall_risk(
     risk_score = 100 - final_authenticity_score
 
     # 3-Tier Classification
-    if final_authenticity_score >= 90:
+    major_layout_mismatch = layout_data.get("major_layout_mismatch", False)
+    
+    if major_layout_mismatch:
+        risk_level = "HIGH RISK"
+        classification = "LIKELY_FAKE"
+        final_authenticity_score = min(final_authenticity_score, 20) # Cap score at 20
+        risk_score = 100 - final_authenticity_score
+    elif final_authenticity_score >= 80:
         risk_level = "LOW RISK"
         classification = "GENUINE"
-    elif final_authenticity_score >= 70:
+    elif final_authenticity_score >= 65:
         risk_level = "MEDIUM RISK"
         classification = "SUSPICIOUS"
     else:

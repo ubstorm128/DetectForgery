@@ -124,20 +124,22 @@ def _process_image_pipeline(tmp_path: str, document_type: str = "aadhaar") -> di
     res_ocr = perform_ocr_analysis(tmp_path)
     detected_side = res_ocr.get("detected_side", "unknown")
 
-    # --- NEW: Early Exit if Card Not Detected ---
-    from card_detectors.aadhaar import AadhaarDetector
-    from card_detectors.pan import PANDetector
+    # --- NEW: Multi-factor Early Exit if Card Not Detected ---
+    from card_detectors.validator import detect_supported_card
     
-    if document_type.lower() == "pan":
-        detector = PANDetector()
-    else:
-        detector = AadhaarDetector()
-        
-    card_check = detector.detect_card_number(res_ocr.get("boxes", []), res_ocr.get("text", ""))
-    if not card_check.get("detected", False):
+    validation_result = detect_supported_card(tmp_path, document_type, res_ocr, threshold=0.45)
+    
+    # Print debug log to console
+    print("\n--- Card Detection Debug Log ---")
+    for log_entry in validation_result.get("debug_log", []):
+        print(log_entry)
+    print("--------------------------------\n")
+    
+    if not validation_result.get("detected", False):
         return {
             "error": "CARD_NOT_DETECTED",
-            "message": f"No valid {document_type.upper()} card detected in the image."
+            "message": f"No valid {document_type.upper()} card detected in the image.",
+            "debug_log": validation_result.get("debug_log", [])
         }
     # --------------------------------------------
 
@@ -237,38 +239,32 @@ async def analyze_id(
 
     try:
         report = _process_image_pipeline(tmp_path, document_type=document_type)
-        layout_components = report.get("layout", {}).get("components", {})
-        ocr_conf = report.get("ocr", {}).get("confidence", 0.0)
+        if report.get("error") == "CARD_NOT_DETECTED":
+            return {
+                "document": {
+                    "type": document_type,
+                    "side": "unknown",
+                    "detected": False
+                },
+                "verification": {
+                    "status": "invalid",
+                    "score": 0
+                }
+            }
 
+        score = report.get("overall_score", 0)
+        classification = report.get("classification", "LIKELY_FAKE")
+        
         return {
-            "overall_score": report.get("overall_score", 90),
-            "authenticity_score": report.get("authenticity_score", 90),
-            "risk_score": report.get("risk_score", 10),
-            "risk_level": report.get("risk_level", "LOW RISK"),
-            "confidence": report.get("confidence", 0.90),
-            "layout": {
-                "score": report.get("layout", {}).get("score", 90),
-                "position": layout_components.get("position", 95),
-                "size": layout_components.get("size", 92),
-                "alignment": layout_components.get("alignment", 95),
-                "spacing": layout_components.get("spacing", 92),
-                "region_structure": layout_components.get("region_structure", 90),
-                "explainable_reasons": report.get("layout", {}).get("explainable_reasons", [])
+            "document": {
+                "type": document_type,
+                "side": report.get("detected_side", "unknown"),
+                "detected": True
             },
-            "ocr": {
-                "score": report.get("checks", {}).get("ocr", {}).get("score", 95),
-                "average_confidence": round(ocr_conf, 2),
-                "detected_side": report.get("detected_side", "front"),
-                "boxes": report.get("ocr", {}).get("boxes", [])
-            },
-            "image_quality": {
-                "score": report.get("image_quality", {}).get("score", 88),
-                "sharpness": report.get("image_quality", {}).get("sharpness", 85),
-                "brightness": report.get("image_quality", {}).get("brightness", 90),
-                "contrast": report.get("image_quality", {}).get("contrast", 88)
-            },
-            "warnings": report.get("warnings", []),
-            "disclaimer": report.get("disclaimer")
+            "verification": {
+                "status": "valid" if classification != "LIKELY_FAKE" else "invalid",
+                "score": score
+            }
         }
     finally:
         if os.path.exists(tmp_path):

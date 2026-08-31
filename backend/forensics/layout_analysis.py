@@ -246,7 +246,54 @@ def evaluate_region_structure(
     Validates presence and correct relative spatial zones for expected regions
     using both extracted boxes and image structural feature presence.
     """
+    import json
     regions_def = FRONT_REGIONS if detected_side == "front" else BACK_REGIONS
+    
+    # Try to load regions from the specific template JSON
+    try:
+        template_file = f"templates/aadhaar_{detected_side}.json"
+        with open(template_file, "r") as f:
+            template_config = json.load(f)
+            
+        variants = template_config.get("layout", {}).get("variants", {})
+        # If variants exist, use the first variant's regions (e.g. standard_paper) for general region checking
+        if variants:
+            first_variant = list(variants.keys())[0]
+            template_regions = variants[first_variant].get("regions", {})
+            if template_regions:
+                regions_def = {}
+                for key, val in template_regions.items():
+                    # Parse position if it's relative
+                    rel = val.get("relative", {})
+                    x = rel.get("x")
+                    y = rel.get("y")
+                    w = rel.get("width")
+                    h = rel.get("height")
+                    if x is not None and y is not None and w is not None and h is not None:
+                        regions_def[key] = {
+                            "x_range": (x, x + w),
+                            "y_range": (y, y + h),
+                            "name": key.replace("_", " ").title()
+                        }
+                    else:
+                        # Fallback heuristic ranges based on position keyword
+                        pos = val.get("position", "")
+                        if "top" in pos: y_range = (0.0, 0.3)
+                        elif "bottom" in pos: y_range = (0.7, 1.0)
+                        else: y_range = (0.2, 0.8)
+                        
+                        if "left" in pos: x_range = (0.0, 0.4)
+                        elif "right" in pos: x_range = (0.6, 1.0)
+                        else: x_range = (0.2, 0.8)
+                        
+                        regions_def[key] = {
+                            "x_range": x_range,
+                            "y_range": y_range,
+                            "name": key.replace("_", " ").title()
+                        }
+    except Exception:
+        pass
+
     matched_regions = 0
     warnings = []
 
@@ -276,7 +323,7 @@ def evaluate_region_structure(
         if has_content:
             matched_regions += 1
         else:
-            if reg_key in ["aadhaar_number", "personal_details", "address_details"]:
+            if reg_key in ["aadhaar_number", "personal_details", "address_details", "qr_code", "address_block"]:
                 warnings.append(f"Expected {reg_info['name']} zone has weak structural signature.")
 
     total_regions = len(regions_def)
@@ -307,7 +354,19 @@ def perform_layout_analysis(
         return {"status": "failed", "score": 0, "risk": 100, "error": "Could not decode uploaded image"}
 
     # 1. Perspective correction & Rectification
-    rectified_img, persp_meta = correct_perspective_and_normalize(img_raw, target_width=1000, target_height=630)
+    # We load aadhaar_front.json just to get the target dimensions for normalization
+    import json
+    template_config = {}
+    try:
+        with open("templates/aadhaar_front.json", "r") as f:
+            template_config = json.load(f)
+    except:
+        pass
+        
+    t_width = template_config.get("card_normalization", {}).get("normalized_size", {}).get("width", 1500)
+    t_height = template_config.get("card_normalization", {}).get("normalized_size", {}).get("height", 950)
+    
+    rectified_img, persp_meta = correct_perspective_and_normalize(img_raw, target_width=t_width, target_height=t_height)
     preprocessed = preprocess_image_for_analysis(rectified_img)
     processed_gray = preprocessed["gray"]
 
@@ -319,12 +378,12 @@ def perform_layout_analysis(
     # 3. Reference Image Handling
     ref_boxes = []
     ref_gray = None
-    ref_ratio = 1000 / 630  # Standard Aadhaar aspect ratio ~1.587
+    ref_ratio = t_width / t_height
 
     if reference_path and os.path.exists(reference_path):
         ref_raw = cv2.imread(reference_path)
         if ref_raw is not None:
-            ref_rectified, _ = correct_perspective_and_normalize(ref_raw, target_width=1000, target_height=630)
+            ref_rectified, _ = correct_perspective_and_normalize(ref_raw, target_width=t_width, target_height=t_height)
             ref_gray = cv2.cvtColor(ref_rectified, cv2.COLOR_BGR2GRAY)
             ref_ocr = extract_ocr_data(ref_rectified)
             ref_boxes = ref_ocr.get("boxes", [])
@@ -332,12 +391,9 @@ def perform_layout_analysis(
     # If no reference file boxes available, synthesize expected template anchor points from template definitions
     if not ref_boxes:
         if detected_side == "back":
-            ref_boxes = [
-                {"text": "address", "norm_cx": 0.35, "norm_cy": 0.28, "norm_w": 0.40, "norm_h": 0.05, "confidence": 0.99},
-                {"text": "pincode", "norm_cx": 0.30, "norm_cy": 0.55, "norm_w": 0.25, "norm_h": 0.04, "confidence": 0.99},
-                {"text": "1947",    "norm_cx": 0.50, "norm_cy": 0.12, "norm_w": 0.30, "norm_h": 0.04, "confidence": 0.99},
-                {"text": "aadhaar", "norm_cx": 0.50, "norm_cy": 0.88, "norm_w": 0.35, "norm_h": 0.06, "confidence": 0.99}
-            ]
+            # For the back side, do not use brittle hardcoded boxes since variants have different layouts.
+            # We rely on evaluate_region_structure and OCR validations instead.
+            ref_boxes = []
         else:
             ref_boxes = [
                 {"text": "government of india", "norm_cx": 0.50, "norm_cy": 0.08, "norm_w": 0.45, "norm_h": 0.05, "confidence": 0.99},
@@ -388,10 +444,53 @@ def perform_layout_analysis(
         explainable_reasons.append("✓ Key document regions (Header, Details, ID number) verified")
 
     all_warnings = pos_warnings + size_warnings + align_warnings + spacing_warnings + region_warnings
+    
+    # NEW: STRICT TEMPLATE MATCHING LOGIC
+    major_layout_mismatch = False
+    
+    if detected_side == "front" and template_config.get("layout", {}).get("strict", False):
+        layout_rules = template_config["layout"]
+        regions = layout_rules.get("regions", {})
+        pos_tolerance = layout_rules.get("global_position_tolerance_percent", 3) / 100.0
+        
+        for reg_key, reg_info in regions.items():
+            if not reg_info.get("required", False):
+                continue
+                
+            bbox = reg_info.get("bounding_box", {})
+            xmin = bbox.get("x", 0) / 100.0
+            ymin = bbox.get("y", 0) / 100.0
+            xmax = (bbox.get("x", 0) + bbox.get("width", 0)) / 100.0
+            ymax = (bbox.get("y", 0) + bbox.get("height", 0)) / 100.0
+            
+            matched = False
+            # Check OCR boxes
+            for b in uploaded_boxes:
+                if (xmin - pos_tolerance) <= b["norm_cx"] <= (xmax + pos_tolerance) and \
+                   (ymin - pos_tolerance) <= b["norm_cy"] <= (ymax + pos_tolerance):
+                    matched = True
+                    break
+                    
+            # Check structural image variance (for photo, logos)
+            if not matched and processed_gray is not None:
+                h, w = processed_gray.shape[:2]
+                ry1, ry2 = int(ymin * h), int(ymax * h)
+                rx1, rx2 = int(xmin * w), int(xmax * w)
+                roi = processed_gray[ry1:ry2, rx1:rx2]
+                if roi.size > 0:
+                    roi_var = float(np.var(roi))
+                    if roi_var > 150: # Strong structural presence
+                        matched = True
+                        
+            if not matched:
+                all_warnings.append(f"CRITICAL: Required element '{reg_key}' missing or outside strict tolerance bounds.")
+                major_layout_mismatch = True
+
     if not all_warnings:
         explainable_reasons.append("✓ No significant structural or geometric anomalies detected")
     else:
-        for w in all_warnings[:4]:
+        # Display top warnings
+        for w in list(dict.fromkeys(all_warnings))[:5]:
             explainable_reasons.append(f"⚠ {w}")
 
     # Risk is the complement of layout authenticity score
@@ -413,5 +512,6 @@ def perform_layout_analysis(
         "edge_metrics": edge_metrics,
         "detected_side": detected_side,
         "explainable_reasons": explainable_reasons,
-        "anomalies": all_warnings
+        "anomalies": all_warnings,
+        "major_layout_mismatch": major_layout_mismatch
     }
