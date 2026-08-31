@@ -60,41 +60,7 @@ def test_endpoints():
     print(f"✓ Image Quality: {data.get('image_quality', {}).get('score')}")
     assert "layout" in data and "image_quality" in data and "confidence" in data
 
-    # 5. POST /analyze-id (Standard Schema Endpoint)
-    print("\n[API 5] Testing POST /analyze-id (Standard REST Endpoint)...")
-    with open(ref_path, "rb") as f:
-        r = client.post(
-            "/analyze-id",
-            files={"file": ("front_aadhaar.jpeg", f, "image/jpeg")},
-            data={"document_type": "aadhaar"}
-        )
-    assert r.status_code == 200, f"Analyze-id failed: {r.text}"
-    std_data = r.json()
-    print(f"✓ Standard Response:")
-    print(f"  Overall Score: {std_data['overall_score']}")
-    print(f"  Risk Level: {std_data['risk_level']}")
-    print(f"  Layout Details: {std_data['layout']}")
-    print(f"  OCR Score: {std_data['ocr']['score']}")
-    print(f"  Image Quality: {std_data['image_quality']}")
-    assert "position" in std_data["layout"]
-    assert "size" in std_data["layout"]
-    assert "alignment" in std_data["layout"]
-    assert "spacing" in std_data["layout"]
-    assert "region_structure" in std_data["layout"]
 
-    # 6. POST /api/compare-sides
-    print("\n[API 6] Testing POST /api/compare-sides...")
-    compare_payload = {
-        "front_text": "Government of India 1234 5678 9012 DOB 15/08/1990",
-        "back_text": "Address 1234 5678 9012 PIN 110001",
-        "front_score": 92,
-        "back_score": 90
-    }
-    r = client.post("/api/compare-sides", json=compare_payload)
-    assert r.status_code == 200, f"Compare sides failed: {r.text}"
-    cmp_res = r.json()
-    print(f"✓ Compare Sides -> {cmp_res}")
-    assert cmp_res["status"] == "PASS"
 
     print("\n" + "=" * 60)
     print("ALL API ENDPOINTS TESTED AND VERIFIED SUCCESSFULLY!")

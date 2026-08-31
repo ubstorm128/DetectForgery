@@ -1,7 +1,7 @@
 import cv2
 import numpy as np
-from .aadhaar import AadhaarDetector
-from .pan import PANDetector
+from card_detectors.aadhaar.detector import AadhaarDetector
+from card_detectors.pan.detector import PANDetector
 
 def detect_supported_card(image_path: str, document_type: str, ocr_data: dict, threshold: float = 0.45) -> dict:
     """
@@ -18,13 +18,12 @@ def detect_supported_card(image_path: str, document_type: str, ocr_data: dict, t
     
     h, w = img.shape[:2]
     
-    # 1. Aspect Ratio Check
-    # Cards typically have an aspect ratio of ~1.58 (ID-1 format). We allow 1.2 to 2.0 to cover cropped photos.
+    # 1. Aspect Ratio Check (Now always ~1.58 due to prior cropping, so we verify but give less weight)
     if min(h, w) > 0:
         aspect_ratio = max(h, w) / min(h, w)
-        if 1.2 <= aspect_ratio <= 2.0:
-            score += 0.2
-            debug_log.append(f"Pass: Aspect ratio {aspect_ratio:.2f} is card-like (+0.2)")
+        if 1.4 <= aspect_ratio <= 1.8:
+            score += 0.1
+            debug_log.append(f"Pass: Aspect ratio {aspect_ratio:.2f} is card-like (+0.1)")
         else:
             debug_log.append(f"Fail: Aspect ratio {aspect_ratio:.2f} is not typical for ID cards (+0.0)")
     else:
@@ -32,14 +31,14 @@ def detect_supported_card(image_path: str, document_type: str, ocr_data: dict, t
         
     # 2. Text Density & Structure
     boxes = ocr_data.get("boxes", [])
-    if len(boxes) >= 4:
+    if len(boxes) >= 8:
         score += 0.2
-        debug_log.append(f"Pass: Found {len(boxes)} text boxes, indicating a document structure (+0.2)")
-    elif len(boxes) > 0:
+        debug_log.append(f"Pass: Found {len(boxes)} text boxes, strong document structure (+0.2)")
+    elif len(boxes) >= 4:
         score += 0.1
-        debug_log.append(f"Partial Pass: Found only {len(boxes)} text boxes (+0.1)")
+        debug_log.append(f"Partial Pass: Found {len(boxes)} text boxes (+0.1)")
     else:
-        debug_log.append(f"Fail: No text boxes detected (+0.0)")
+        debug_log.append(f"Fail: Insufficient text boxes detected ({len(boxes)}) (+0.0)")
         
     # 3. Card-specific keywords
     full_text = ocr_data.get("text", "").lower()
@@ -55,22 +54,22 @@ def detect_supported_card(image_path: str, document_type: str, ocr_data: dict, t
         detector = None
         
     matched_keywords = sum(1 for kw in keywords if kw in full_text)
-    if matched_keywords >= 1:
+    if matched_keywords >= 2:
         # Cap keyword score at 0.3 (3+ keywords)
         kw_score = min(0.3, matched_keywords * 0.1)
         score += kw_score
         debug_log.append(f"Pass: Found {matched_keywords} '{document_type}' keyword(s) (+{kw_score:.2f})")
     else:
-        debug_log.append(f"Fail: No '{document_type}' specific keywords found (+0.0)")
+        debug_log.append(f"Fail: Insufficient '{document_type}' specific keywords found (+0.0)")
         
-    # 4. Try strict Card Number detection
+    # 4. Strict Regex Card Number detection (Crucial for validation)
     if detector:
         card_check = detector.detect_card_number(boxes, ocr_data.get("text", ""))
         if card_check.get("detected"):
-            score += 0.5
-            debug_log.append(f"Pass: Exact {document_type} number pattern detected confidently (+0.5)")
+            score += 0.6  # Highly weighted
+            debug_log.append(f"Pass: Exact {document_type} number pattern detected confidently (+0.6)")
         else:
-            debug_log.append(f"Fail: Exact card number NOT detected cleanly by OCR (+0.0)")
+            debug_log.append(f"Fail: Exact card number NOT detected cleanly by strict regex (+0.0)")
             
     # 5. Structural / Visual Features (QR Code & Photo Region)
     # Detect QR Code (typically on the back of Aadhaar/PAN)

@@ -1,5 +1,5 @@
 import re
-from .base import CardDetector
+from ..common.base import CardDetector
 
 class AadhaarDetector(CardDetector):
     def normalize(self, value: str) -> str:

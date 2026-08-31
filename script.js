@@ -3,10 +3,7 @@ const API_BASE = window.location.origin.includes('localhost') || window.location
     ? "" 
     : (window.location.origin.includes('github.io') ? "https://detectforgery.onrender.com" : "");
 
-// State for Dual-Upload Workflow & Analysis
-let frontData = null;
-let backData = null;
-let frontFile = null;
+// State for Analysis
 let currentResultData = null;
 let currentImageObject = null;
 let activeOverlays = {
@@ -236,14 +233,14 @@ async function handleFile(file) {
         
         clearInterval(interval);
         
-        if (data.error === "CARD_NOT_DETECTED") {
+        if (data.error === "CARD_NOT_DETECTED" || data.status === "REJECTED") {
             if (data.debug_log) {
                 console.warn("Card Detection Failed:");
                 data.debug_log.forEach(log => console.warn("  " + log));
             }
             await showCustomPopup(
                 "ID Card Not Detected",
-                "Please upload a clear image of a supported ID card to continue verification.",
+                data.reason || "Please upload a clear image of a supported ID card to continue verification.",
                 "alert",
                 "Upload ID Card"
             );
@@ -282,76 +279,9 @@ function resetToUploadState(message) {
     });
 }
 
-async function performCrossCheck() {
-    document.getElementById('section-upload').classList.add('hidden');
-    document.getElementById('section-analyzing').classList.remove('hidden');
-    
-    const analyzingStatusText = document.getElementById('analyzing-status-text');
-    if (analyzingStatusText) {
-        analyzingStatusText.textContent = 'Performing cross-check analysis...';
-    }
-    
-    try {
-        const reqBody = {
-            document_type: document.getElementById('document-type').value,
-            front_text: (frontData.ocr && frontData.ocr.text) || "",
-            back_text: (backData.ocr && backData.ocr.text) || "",
-            front_boxes: (frontData.ocr && frontData.ocr.boxes) || [],
-            back_boxes: (backData.ocr && backData.ocr.boxes) || [],
-            front_score: frontData.authenticity_score || frontData.overall_score || 85,
-            back_score: backData.authenticity_score || backData.overall_score || 85,
-            front_aadhaar: (frontData.ocr && frontData.ocr.aadhaar_number) || "",
-            back_aadhaar: (backData.ocr && backData.ocr.aadhaar_number) || ""
-        };
-        
-        const res = await fetch(`${API_BASE}/api/compare-sides`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(reqBody)
-        });
-        
-        const compareData = await res.json();
-        
-        const mergedData = {
-            authenticity_score: compareData.combined_authenticity_score,
-            overall_score: compareData.combined_authenticity_score,
-            result: compareData.classification,
-            risk_level: compareData.risk_level || (compareData.combined_authenticity_score >= 90 ? "LOW RISK" : (compareData.combined_authenticity_score >= 70 ? "MEDIUM RISK" : "HIGH RISK")),
-            confidence: frontData.confidence || 0.92,
-            checks: frontData.checks,
-            layout: frontData.layout,
-            image_quality: frontData.image_quality,
-            ocr: frontData.ocr,
-            warnings: frontData.warnings || []
-        };
-        
-        const status = compareData.comparison ? compareData.comparison.status : compareData.status;
-        
-        if (status === "MISMATCH") {
-            mergedData.checks["cross_match"] = { score: 20, status: "FAIL", name: "Front/Back Cross-Match" };
-        } else if (status === "MATCH") {
-            mergedData.checks["cross_match"] = { score: 100, status: "PASS", name: "Front/Back Cross-Match" };
-        } else {
-            // NOT_DETECTED doesn't inherently mean fake, just couldn't read it
-            mergedData.checks["cross_match"] = { score: 85, status: "PASS", name: "Front/Back Cross-Match (Unverified)" };
-        }
-        
-        mergedData.comparison = compareData.comparison;
-        mergedData.matched_aadhaar = compareData.matched_aadhaar;
-        mergedData.front_number = compareData.front_number;
-        mergedData.back_number = compareData.back_number;
-        mergedData.card_type = compareData.card_type || "Aadhaar";
-        
-        setTimeout(() => showResults(mergedData, frontFile, compareData.anomalies), 400);
-        
-    } catch(e) {
-        console.error(e);
-        alert("Dual-sided cross check could not be completed.");
-        resetApp();
-    }
-}
 
-function showResults(data, file, extraAnomalies=[]) {
+
+function showResults(data, file) {
     currentResultData = data;
     document.getElementById('section-analyzing').classList.add('hidden');
     document.getElementById('section-results').classList.remove('hidden');
@@ -384,7 +314,7 @@ function showResults(data, file, extraAnomalies=[]) {
     // Display Aadhaar Number
     let aadhaarEl = document.getElementById('aadhaar-number-display');
     
-    if (data.matched_aadhaar || data.front_number !== undefined || data.back_number !== undefined || (data.ocr && data.ocr.aadhaar_number)) {
+    if (data.ocr && data.ocr.aadhaar_number) {
         if (!aadhaarEl) {
             aadhaarEl = document.createElement('div');
             aadhaarEl.id = 'aadhaar-number-display';
@@ -402,29 +332,14 @@ function showResults(data, file, extraAnomalies=[]) {
             }
         }
         
-        const cardName = (data.card_type || "Aadhaar").toUpperCase();
+        const cardName = (data.card_type || data.document_type || "Aadhaar").toUpperCase();
         
-        if (data.matched_aadhaar || (data.comparison && data.comparison.status === "MATCH") || (data.ocr && data.ocr.aadhaar_number)) {
-            const num = data.matched_aadhaar || data.front_number || (data.ocr && data.ocr.aadhaar_number);
-            const formatted = num.replace(/(.{4})/g, '$1 ').trim();
-            aadhaarEl.innerHTML = `${cardName} NUMBER: <span style="font-size: 1.1rem; letter-spacing: 2px;">${formatted}</span>`;
-            aadhaarEl.style.backgroundColor = 'rgba(59, 130, 246, 0.1)';
-            aadhaarEl.style.border = '1px solid var(--primary)';
-            aadhaarEl.style.color = 'var(--primary)';
-        } else if (!data.front_number && !data.back_number) {
-            aadhaarEl.style.display = 'none';
-        } else {
-            const formattedF = data.front_number ? data.front_number.replace(/(.{4})/g, '$1 ').trim() : "NOT DETECTED";
-            const formattedB = data.back_number ? data.back_number.replace(/(.{4})/g, '$1 ').trim() : "NOT DETECTED";
-            aadhaarEl.innerHTML = `
-                <div style="color: var(--danger); font-size: 0.9rem; text-transform: uppercase; margin-bottom: 0.25rem;">⚠ Number Mismatch</div>
-                <div style="font-size: 0.85rem; color: var(--text-muted); font-weight: 500;">Front: <span style="text-decoration: line-through;">${formattedF}</span></div>
-                <div style="font-size: 0.85rem; color: var(--text-muted); font-weight: 500;">Back: <span style="text-decoration: line-through;">${formattedB}</span></div>
-            `;
-            aadhaarEl.style.backgroundColor = 'rgba(239, 68, 68, 0.1)';
-            aadhaarEl.style.border = '1px solid var(--danger)';
-            aadhaarEl.style.color = 'inherit';
-        }
+        const num = data.ocr.aadhaar_number;
+        const formatted = num.replace(/(.{4})/g, '$1 ').trim();
+        aadhaarEl.innerHTML = `${cardName} NUMBER: <span style="font-size: 1.1rem; letter-spacing: 2px;">${formatted}</span>`;
+        aadhaarEl.style.backgroundColor = 'rgba(59, 130, 246, 0.1)';
+        aadhaarEl.style.border = '1px solid var(--primary)';
+        aadhaarEl.style.color = 'var(--primary)';
         aadhaarEl.style.display = 'block';
     } else if (aadhaarEl) {
         aadhaarEl.style.display = 'none';
@@ -441,8 +356,7 @@ function showResults(data, file, extraAnomalies=[]) {
         { key: 'copy_move', name: 'Copy-Move Analysis' },
         { key: 'compression', name: 'Compression (DCT)' },
         { key: 'geometry', name: 'Document Geometry' },
-        { key: 'metadata', name: 'Metadata & EXIF' },
-        { key: 'cross_match', name: 'Front/Back Cross-Match' }
+        { key: 'metadata', name: 'Metadata & EXIF' }
     ];
     
     if (data.checks) {
@@ -520,14 +434,6 @@ function showResults(data, file, extraAnomalies=[]) {
             reasonsList.appendChild(rLi);
         }
 
-        if (extraAnomalies && extraAnomalies.length > 0) {
-            extraAnomalies.forEach(anomaly => {
-                const rLi = document.createElement('li');
-                rLi.className = 'reason-danger';
-                rLi.textContent = `⚠ ${anomaly}`;
-                reasonsList.appendChild(rLi);
-            });
-        }
     }
     
     // Setup Canvas Image & Render Overlays

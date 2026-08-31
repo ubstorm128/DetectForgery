@@ -251,11 +251,12 @@ def evaluate_region_structure(
     
     # Try to load regions from the specific template JSON
     try:
-        template_file = f"templates/aadhaar_{detected_side}.json"
+        template_file = f"templates/aadhaar.json"
         with open(template_file, "r") as f:
             template_config = json.load(f)
             
-        variants = template_config.get("layout", {}).get("variants", {})
+        side_config = template_config.get(f"{detected_side}_side", {})
+        variants = side_config.get("layout", {}).get("variants", {})
         # If variants exist, use the first variant's regions (e.g. standard_paper) for general region checking
         if variants:
             first_variant = list(variants.keys())[0]
@@ -336,7 +337,9 @@ def evaluate_region_structure(
 def perform_layout_analysis(
     image_path: str,
     reference_path: str | None = None,
-    document_type: str = "aadhaar"
+    document_type: str = "aadhaar",
+    precomputed_ocr: dict = None,
+    persp_meta: dict = None
 ) -> dict:
     """
     Full Layout & Formatting Verification Pipeline:
@@ -353,32 +356,25 @@ def perform_layout_analysis(
     if img_raw is None:
         return {"status": "failed", "score": 0, "risk": 100, "error": "Could not decode uploaded image"}
 
-    # 1. Perspective correction & Rectification
-    # We load aadhaar_front.json just to get the target dimensions for normalization
-    import json
-    template_config = {}
-    try:
-        with open("templates/aadhaar_front.json", "r") as f:
-            template_config = json.load(f)
-    except:
-        pass
-        
-    t_width = template_config.get("card_normalization", {}).get("normalized_size", {}).get("width", 1500)
-    t_height = template_config.get("card_normalization", {}).get("normalized_size", {}).get("height", 950)
-    
-    rectified_img, persp_meta = correct_perspective_and_normalize(img_raw, target_width=t_width, target_height=t_height)
+    # 1. Image represents the cropped/rectified image
+    rectified_img = img_raw
     preprocessed = preprocess_image_for_analysis(rectified_img)
     processed_gray = preprocessed["gray"]
 
-    # 2. Extract OCR data from normalized image
-    ocr_result = extract_ocr_data(rectified_img)
+    # 2. Use Precomputed OCR data
+    if precomputed_ocr:
+        ocr_result = precomputed_ocr
+    else:
+        ocr_result = extract_ocr_data(rectified_img)
+        
     uploaded_boxes = ocr_result.get("boxes", [])
     detected_side = ocr_result.get("detected_side", "front")
 
     # 3. Reference Image Handling
     ref_boxes = []
     ref_gray = None
-    ref_ratio = t_width / t_height
+    t_height, t_width = rectified_img.shape[:2]
+    ref_ratio = t_width / t_height if t_height > 0 else 1.58
 
     if reference_path and os.path.exists(reference_path):
         ref_raw = cv2.imread(reference_path)
@@ -447,6 +443,14 @@ def perform_layout_analysis(
     
     # NEW: STRICT TEMPLATE MATCHING LOGIC
     major_layout_mismatch = False
+    
+    import json
+    template_config = {}
+    try:
+        with open("templates/aadhaar.json", "r") as f:
+            template_config = json.load(f).get(f"{detected_side}_side", {})
+    except Exception:
+        pass
     
     if detected_side == "front" and template_config.get("layout", {}).get("strict", False):
         layout_rules = template_config["layout"]

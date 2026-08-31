@@ -15,15 +15,17 @@ import re
 import cv2
 
 from services.image_quality import assess_image_quality
-from forensics.ocr_analysis import perform_ocr_analysis
 from forensics.layout_analysis import perform_layout_analysis
+from forensics.metadata import perform_metadata_analysis
 from forensics.ela import perform_ela
 from forensics.noise import perform_noise_analysis
 from forensics.copy_move import perform_copy_move_detection
 from forensics.compression import perform_compression_analysis
-from forensics.metadata import perform_metadata_analysis
 from forensics.edges import perform_edge_analysis
 from forensics.scoring import calculate_overall_risk
+from services.perspective import correct_perspective_and_normalize
+from services.ocr_service import extract_ocr_data
+import json
 
 
 app = FastAPI(
@@ -120,30 +122,65 @@ def _process_image_pipeline(tmp_path: str, document_type: str = "aadhaar") -> di
     raw_img = cv2.imread(tmp_path)
     quality_report = assess_image_quality(raw_img)
 
-    # 1. OCR Analysis (with PaddleOCR)
-    res_ocr = perform_ocr_analysis(tmp_path)
+    # 1. Early Perspective Crop & Normalization
+    try:
+        with open(f"templates/{document_type}.json", "r") as f:
+            template_config = json.load(f)
+            template_config = template_config.get("front_side", template_config) # Default to front side rules for sizing
+    except:
+        template_config = {}
+        
+    t_width = template_config.get("card_normalization", {}).get("normalized_size", {}).get("width", 1500)
+    t_height = template_config.get("card_normalization", {}).get("normalized_size", {}).get("height", 950)
+    
+    rectified_img, persp_meta = correct_perspective_and_normalize(raw_img, target_width=t_width, target_height=t_height)
+    
+    # Save cropped image temporarily for OCR and Layout
+    cropped_tmp_path = tmp_path + "_cropped.jpg"
+    cv2.imwrite(cropped_tmp_path, rectified_img)
+
+    # 2. OCR Analysis on Cropped Image
+    res_ocr = extract_ocr_data(cropped_tmp_path)
+    # Map status to avoid breaking other modules
+    if res_ocr.get("status") == "failed":
+        res_ocr["risk"] = 0
+        res_ocr["confidence"] = 0.0
+        res_ocr["anomalies"] = [res_ocr.get("error", "OCR failure")]
+    else:
+        avg_conf = res_ocr.get("confidence", 0.0)
+        risk_score = 0
+        if avg_conf < 0.30 and len(res_ocr.get("boxes", [])) > 0:
+            risk_score = 15
+        elif len(res_ocr.get("boxes", [])) == 0:
+            risk_score = 25
+        res_ocr["risk"] = risk_score
+        res_ocr["anomalies"] = []
     detected_side = res_ocr.get("detected_side", "unknown")
 
-    # --- NEW: Multi-factor Early Exit if Card Not Detected ---
-    from card_detectors.validator import detect_supported_card
+    # 3. Multi-factor Early Exit Validation (Strict Pre-Validation)
+    from card_detectors.common.validator import detect_supported_card
     
-    validation_result = detect_supported_card(tmp_path, document_type, res_ocr, threshold=0.45)
+    validation_result = detect_supported_card(cropped_tmp_path, document_type, res_ocr, threshold=0.45)
     
-    # Print debug log to console
     print("\n--- Card Detection Debug Log ---")
     for log_entry in validation_result.get("debug_log", []):
         print(log_entry)
     print("--------------------------------\n")
     
     if not validation_result.get("detected", False):
+        if os.path.exists(cropped_tmp_path): os.remove(cropped_tmp_path)
         return {
-            "error": "CARD_NOT_DETECTED",
-            "message": f"No valid {document_type.upper()} card detected in the image.",
+            "document_type": "unknown",
+            "is_aadhaar": False,
+            "side": None,
+            "document_confidence": validation_result.get("confidence", 0.0),
+            "score": None,
+            "status": "REJECTED",
+            "reason": f"Uploaded image is not an {document_type.capitalize()} card",
             "debug_log": validation_result.get("debug_log", [])
         }
-    # --------------------------------------------
 
-    # 3. Reference-based Structural Layout Analysis
+    # 4. Reference-based Structural Layout Analysis (on Cropped Image)
     reference_dir = os.path.join(os.path.dirname(__file__), "reference")
     if detected_side == "front":
         reference_path = os.path.join(reference_dir, "front_aadhaar.jpeg")
@@ -153,10 +190,15 @@ def _process_image_pipeline(tmp_path: str, document_type: str = "aadhaar") -> di
         reference_path = os.path.join(reference_dir, "front_aadhaar.jpeg")
 
     res_layout = perform_layout_analysis(
-        image_path=tmp_path,
+        image_path=cropped_tmp_path,
         reference_path=reference_path if os.path.exists(reference_path) else None,
-        document_type=document_type
+        document_type=document_type,
+        precomputed_ocr=res_ocr,
+        persp_meta=persp_meta
     )
+    
+    if os.path.exists(cropped_tmp_path):
+        os.remove(cropped_tmp_path)
 
     # 4. Forensic Modules (analyzing original image)
     res_ela = perform_ela(tmp_path)
@@ -198,8 +240,19 @@ def _process_image_pipeline(tmp_path: str, document_type: str = "aadhaar") -> di
         )
 
     report["detected_side"] = detected_side
+    report["side"] = detected_side
     report["layout"] = res_layout
     report["ocr"] = res_ocr
+    report["document_type"] = document_type
+    report["is_aadhaar"] = (document_type.lower() == "aadhaar")
+    report["document_confidence"] = validation_result.get("confidence", 1.0)
+    
+    if report.get("classification") == "LIKELY_FAKE":
+        report["status"] = "INVALID"
+    elif report.get("classification") == "SUSPICIOUS":
+        report["status"] = "SUSPICIOUS"
+    else:
+        report["status"] = "VALID"
 
     return report
 
@@ -222,157 +275,3 @@ async def analyze_image(
         if os.path.exists(tmp_path):
             os.remove(tmp_path)
 
-
-@app.post("/analyze-id")
-async def analyze_id(
-    file: UploadFile = File(...),
-    document_type: str = Form("aadhaar")
-):
-    """
-    Standardized REST API endpoint returning structured verification report.
-    """
-    suffix = os.path.splitext(file.filename or "")[1] or ".jpg"
-
-    with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
-        shutil.copyfileobj(file.file, tmp)
-        tmp_path = tmp.name
-
-    try:
-        report = _process_image_pipeline(tmp_path, document_type=document_type)
-        if report.get("error") == "CARD_NOT_DETECTED":
-            return {
-                "document": {
-                    "type": document_type,
-                    "side": "unknown",
-                    "detected": False
-                },
-                "verification": {
-                    "status": "invalid",
-                    "score": 0
-                }
-            }
-
-        score = report.get("overall_score", 0)
-        classification = report.get("classification", "LIKELY_FAKE")
-        
-        return {
-            "document": {
-                "type": document_type,
-                "side": report.get("detected_side", "unknown"),
-                "detected": True
-            },
-            "verification": {
-                "status": "valid" if classification != "LIKELY_FAKE" else "invalid",
-                "score": score
-            }
-        }
-    finally:
-        if os.path.exists(tmp_path):
-            os.remove(tmp_path)
-
-
-from card_detectors.aadhaar import AadhaarDetector
-from card_detectors.pan import PANDetector
-
-class CompareSidesRequest(BaseModel):
-    document_type: str = "aadhaar"
-    front_text: str = ""
-    back_text: str = ""
-    front_boxes: list = []
-    back_boxes: list = []
-    front_score: int = 0
-    back_score: int = 0
-    front_aadhaar: str = ""
-    back_aadhaar: str = ""
-
-
-@app.post("/api/compare-sides")
-async def compare_sides(req: CompareSidesRequest):
-    if req.document_type.lower() == "pan":
-        detector = PANDetector()
-    else:
-        detector = AadhaarDetector()
-        
-    front_result = detector.detect_card_number(req.front_boxes, req.front_text)
-    back_result = detector.detect_card_number(req.back_boxes, req.back_text)
-    
-    # --- DEBUG LOGGING ---
-    print("\n" + "="*20 + " CARD NUMBER DEBUG " + "="*20)
-    print(f"Card Type: {req.document_type.upper()}")
-    
-    print("\nSide: FRONT")
-    print("Raw OCR Text:", req.front_text)
-    print("Raw Boxes:", [b.get("text") for b in req.front_boxes])
-    print("Selected:", front_result)
-    
-    print("\nSide: BACK")
-    print("Raw OCR Text:", req.back_text)
-    print("Raw Boxes:", [b.get("text") for b in req.back_boxes])
-    print("Selected:", back_result)
-    print("="*60 + "\n")
-    # ---------------------
-    
-    # Fallback to the pre-extracted numbers if the detector fails and the frontend provided them
-    if not front_result["detected"] and req.front_aadhaar:
-        front_result = {"raw_text": req.front_aadhaar, "normalized": detector.normalize(req.front_aadhaar), "confidence": 0.9, "detected": True}
-    if not back_result["detected"] and req.back_aadhaar:
-        back_result = {"raw_text": req.back_aadhaar, "normalized": detector.normalize(req.back_aadhaar), "confidence": 0.9, "detected": True}
-
-    front_norm = front_result.get("normalized")
-    back_norm = back_result.get("normalized")
-    
-    status = "NOT_DETECTED"
-    if front_result["detected"] and back_result["detected"]:
-        if front_norm == back_norm:
-            status = "MATCH"
-        else:
-            status = "MISMATCH"
-            
-    combined_score = (req.front_score + req.back_score) // 2
-    classification = "GENUINE"
-    risk_level = "LOW RISK"
-    anomalies = []
-    
-    if status == "MISMATCH":
-        classification = "LIKELY_FAKE"
-        risk_level = "HIGH RISK"
-        combined_score = min(combined_score, 40)
-        anomalies.append(f"{req.document_type.upper()} Number mismatch between Front and Back scans.")
-    elif status == "NOT_DETECTED":
-        # Do not treat OCR failure as evidence of fraud.
-        pass
-    
-    if classification != "LIKELY_FAKE":
-        if combined_score >= 80:
-            classification = "GENUINE"
-            risk_level = "LOW RISK"
-        elif combined_score >= 65:
-            classification = "SUSPICIOUS"
-            risk_level = "MEDIUM RISK"
-        else:
-            classification = "LIKELY_FAKE"
-            risk_level = "HIGH RISK"
-
-    return {
-        # Old fields for UI backwards compatibility
-        "status": status,
-        "combined_authenticity_score": combined_score,
-        "risk_level": risk_level,
-        "classification": classification,
-        "anomalies": anomalies,
-        "matched_aadhaar": front_norm if status == "MATCH" else None,
-        "front_number": front_norm,
-        "back_number": back_norm,
-        
-        # New Structured Response as per spec
-        "card_type": req.document_type.upper(),
-        "front": {
-            "card_number": front_result
-        },
-        "back": {
-            "card_number": back_result
-        },
-        "comparison": {
-            "status": status
-        }
-    }

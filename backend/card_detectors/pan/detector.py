@@ -1,5 +1,5 @@
 import re
-from .base import CardDetector
+from ..common.base import CardDetector
 
 class PANDetector(CardDetector):
     def normalize(self, value: str) -> str:
