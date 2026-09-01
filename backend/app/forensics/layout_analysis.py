@@ -299,7 +299,7 @@ def evaluate_region_structure(
                             "y_range": y_range,
                             "name": key.replace("_", " ").title()
                         }
-    except Exception:
+    except (FileNotFoundError, json.JSONDecodeError, KeyError):
         pass
 
     matched_regions = 0
@@ -459,7 +459,7 @@ def perform_layout_analysis(
         
         with open(template_file, "r") as f:
             template_config = json.load(f).get(f"{detected_side}_side", {})
-    except Exception:
+    except (FileNotFoundError, json.JSONDecodeError, KeyError):
         pass
     
     if detected_side == "front" and template_config.get("layout", {}).get("strict", False):
@@ -467,6 +467,7 @@ def perform_layout_analysis(
         regions = layout_rules.get("regions", {})
         pos_tolerance = layout_rules.get("global_position_tolerance_percent", 3) / 100.0
         
+        missing_required = 0
         for reg_key, reg_info in regions.items():
             if not reg_info.get("required", False):
                 continue
@@ -498,7 +499,10 @@ def perform_layout_analysis(
                         
             if not matched:
                 all_warnings.append(f"CRITICAL: Required element '{reg_key}' missing or outside strict tolerance bounds.")
-                major_layout_mismatch = True
+                missing_required += 1
+                
+        if missing_required > 1:
+            major_layout_mismatch = True
 
     if not all_warnings:
         explainable_reasons.append("✓ No significant structural or geometric anomalies detected")

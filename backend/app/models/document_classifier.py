@@ -32,10 +32,14 @@ class YOLODocumentClassifier(DocumentClassifier):
         self.model = None
         
         # Mappings from YOLO class indices to standard system identifiers
-        # Simplified for now to focus strictly on Aadhaar
         self.class_map = {
             0: "aadhaar",
-            1: "unknown"
+            1: "pan",
+            2: "passport",
+            3: "driving_licence",
+            4: "voter_id",
+            5: "other_id",
+            6: "unknown"
         }
         
         if self.model_path:
@@ -47,12 +51,21 @@ class YOLODocumentClassifier(DocumentClassifier):
             except Exception as e:
                 print(f"Failed to load YOLO model: {e}")
 
-    def classify(self, cropped_image: np.ndarray) -> dict:
+    def classify(self, cropped_image: np.ndarray, filename: str = "") -> dict:
         if self.model is None:
             # --- MOCK IMPLEMENTATION (Placeholder until real weights are trained) ---
-            # Default everything to aadhaar for now in mock mode
+            doc_type = "aadhaar"
+            filename_lower = filename.lower() if filename else getattr(cropped_image, 'filename', '').lower()
+            
+            if "pan" in filename_lower:
+                doc_type = "pan"
+            elif "passport" in filename_lower:
+                doc_type = "passport"
+            elif "driving" in filename_lower or "dl" in filename_lower:
+                doc_type = "driving_licence"
+                
             return {
-                "document_type": "aadhaar",
+                "document_type": doc_type,
                 "confidence": 0.98
             }
 

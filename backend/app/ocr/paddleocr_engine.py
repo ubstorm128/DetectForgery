@@ -201,6 +201,11 @@ def extract_ocr_data(image: np.ndarray | str) -> dict:
                 if not txt_clean:
                     continue
                     
+                # Mask Aadhaar numbers for privacy (e.g., '1234 5678 9012' -> 'XXXX XXXX 9012')
+                # Matches 4 digits, optional space, 4 digits, optional space, 4 digits
+                aadhaar_pattern = r'\b(\d{4})[ -]?(\d{4})[ -]?(\d{4})\b'
+                txt_clean = re.sub(aadhaar_pattern, r'XXXX XXXX \3', txt_clean)
+                    
                 # Divide coords by 2 because we upscaled the image by 2x
                 xs = [p[0] / 2.0 for p in coords]
                 ys = [p[1] / 2.0 for p in coords]
@@ -245,10 +250,17 @@ def extract_ocr_data(image: np.ndarray | str) -> dict:
     
     detected_side = _detect_document_side_heuristic(img_bgr, full_text)
 
+    status = "completed"
+    if not boxes:
+        status = "failed"
+        avg_conf = None # Avoid fake 0.0 confidence when OCR completely fails
+    elif avg_conf < 0.65:
+        status = "partial"
+
     result = {
-        "status": "completed",
+        "status": status,
         "engine": "paddleocr",
-        "confidence": round(avg_conf, 4),
+        "confidence": round(avg_conf, 4) if avg_conf is not None else None,
         "boxes": boxes,
         "text": full_text,
         "detected_side": detected_side,

@@ -299,12 +299,36 @@ function showResults(data, file) {
     const classEl = document.getElementById('classification');
     const confEl = document.getElementById('confidence-indicator');
     
-    const finalScore = data.result?.score !== undefined ? data.result.score * 100 : 0;
-    const resultType = (data.result?.status || "SUSPICIOUS").toLowerCase();
+    // Check if document was rejected before authentication
+    const vStatus = data.verification?.status || (data.result?.status || "SUSPICIOUS").toLowerCase();
+    
+    if (vStatus === "rejected" || vStatus === "insufficient_quality" || vStatus === "ocr_failure") {
+        const errorMsg = data.errors?.[0]?.message || "Verification failed.";
+        scoreEl.textContent = "--";
+        scoreCont.className = 'score-header likely_fake'; // red background
+        classEl.textContent = vStatus.replace('_', ' ').toUpperCase();
+        
+        // Show error in the checks list
+        document.getElementById('checks-list').innerHTML = `<li class="check-item"><span class="check-name" style="color:var(--error); font-weight:600;">${errorMsg}</span></li>`;
+        const reasonsList = document.getElementById('reasons-list');
+        if(reasonsList) reasonsList.innerHTML = '';
+        
+        // Render canvas and return early
+        const img = new Image();
+        img.onload = () => {
+            currentImageObject = img;
+            renderCanvas();
+        };
+        img.src = URL.createObjectURL(file);
+        return;
+    }
+    
+    const finalScore = data.verification?.authenticity_score ?? (data.result?.score !== undefined ? data.result.score * 100 : 0);
+    const resultType = vStatus;
     
     scoreEl.textContent = Math.round(finalScore);
     scoreCont.className = 'score-header ' + resultType;
-    classEl.textContent = data.result?.status.replace('_', ' ').toUpperCase() || 'UNKNOWN';
+    classEl.textContent = vStatus.replace('_', ' ').toUpperCase() || 'UNKNOWN';
     
     if (confEl && data.document?.confidence !== undefined) {
         confEl.textContent = `Confidence: ${Math.round(data.document.confidence * 100)}%`;
@@ -358,18 +382,18 @@ function showResults(data, file) {
     list.innerHTML = '';
     
     const checksOrder = [
-        { key: 'layout', name: 'Layout & Formatting', scorePath: data.validation?.layout },
-        { key: 'ocr', name: 'OCR / Text Consistency', scorePath: data.validation?.text },
-        { key: 'security', name: 'Security Features', scorePath: data.validation?.security_features },
-        { key: 'manipulation', name: 'Digital Manipulation Analysis', scorePath: data.manipulation_analysis?.score }
+        { key: 'layout', name: 'Layout & Formatting', scorePath: data.forensics?.layout !== undefined ? data.forensics.layout / 100 : data.validation?.layout },
+        { key: 'ocr', name: 'OCR / Text Consistency', scorePath: data.ocr?.confidence !== undefined ? data.ocr.confidence : data.validation?.text },
+        { key: 'security', name: 'Security Features', scorePath: data.forensics?.layout !== undefined ? data.forensics.layout / 100 : data.validation?.security_features },
+        { key: 'manipulation', name: 'Digital Manipulation Analysis', scorePath: data.forensics?.manipulation !== undefined ? data.forensics.manipulation / 100 : data.manipulation_analysis?.score }
     ];
     
     checksOrder.forEach(c => {
-        if (c.scorePath !== undefined) {
+        if (c.scorePath !== undefined && c.scorePath !== null) {
             const li = document.createElement('li');
             li.className = 'check-item';
             const score = Math.round(c.scorePath * 100);
-            const scoreClass = score >= 85 ? 'score-safe' : 'score-warn';
+            const scoreClass = score >= 85 ? 'score-safe' : (score >= 65 ? 'score-warn' : 'score-fail');
             
             let detailsButton = '';
             if (c.key === 'layout') {
@@ -391,12 +415,12 @@ function showResults(data, file) {
     const reasonsList = document.getElementById('reasons-list');
     if (reasonsList) {
         reasonsList.innerHTML = '';
-        const explainReasons = (data.layout && data.layout.explainable_reasons) || [];
+        const explainReasons = data.forensics?.warnings || (data.layout && data.layout.explainable_reasons) || [];
         
         if (explainReasons.length > 0) {
             explainReasons.forEach(r => {
                 const rLi = document.createElement('li');
-                const isWarning = r.startsWith('⚠');
+                const isWarning = r.includes('⚠') || r.includes('CRITICAL');
                 rLi.className = isWarning ? 'reason-warn' : 'reason-safe';
                 rLi.textContent = r;
                 reasonsList.appendChild(rLi);

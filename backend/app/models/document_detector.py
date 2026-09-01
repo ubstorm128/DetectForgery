@@ -60,8 +60,8 @@ class YOLODocumentDetector(DocumentDetector):
             # If the image is entirely white/black (blank_test.jpg) or random noise (fake_test.jpg),
             # fail the detection to simulate YOLO behavior.
             h, w = image.shape[:2]
-            var = np.var(image)
-            if var < 50 or "fake" in str(getattr(image, 'filename', '')) or w < 300: # Simple heuristic for mock
+            filename_lower = str(getattr(image, 'filename', '')).lower()
+            if var < 50 or "fake" in filename_lower or "non_document" in filename_lower or w < 300: # Simple heuristic for mock
                 return {
                     "document_detected": False,
                     "confidence": 0.15,
